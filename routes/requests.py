@@ -83,7 +83,8 @@ async def submit_request(req: ModelRequestSubmit, request: Request):
 async def get_all_requests(user = Depends(get_admin)):
     """Admin only: View all pending requests."""
     conn = await get_db_connection()
-    await conn.execute("SELECT * FROM requests ORDER BY created_at DESC")
+    # Server-side filtering: only fetch pending requests for better performance
+    await conn.execute("SELECT * FROM requests WHERE status = 'pending' ORDER BY created_at DESC")
     requests = await conn.fetchall()
     await conn.close()
     return [r.to_dict() for r in requests]

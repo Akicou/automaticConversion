@@ -319,12 +319,14 @@ async def reopen_ticket(ticket_id: int, request: Request):
 
 @router.get("/all")
 async def get_all_tickets(user = Depends(get_admin)):
-    """Admin only: Get all tickets."""
+    """Admin only: Get all open tickets."""
     conn = await get_db_connection()
+    # Server-side filtering: only fetch open tickets for better performance
     await conn.execute("""
         SELECT t.*, r.hf_repo_id, r.requested_by 
         FROM tickets t 
         JOIN requests r ON t.request_id = r.id 
+        WHERE t.status = 'open'
         ORDER BY t.created_at DESC
     """)
     tickets = await conn.fetchall()

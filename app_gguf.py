@@ -114,34 +114,38 @@ spam_protection = SpamProtection(max_requests_per_hour=10, max_pending_per_user=
 
 # --- User Authentication Helpers ---
 async def get_current_user(request: Request):
-    """Get current user - checks both admin users and OAuth users."""
+    """Get current user - checks both admin users and OAuth users.
+    
+    Returns a dict-like row with additional 'is_oauth' and 'avatar_url' fields
+    to avoid needing separate get_oauth_user calls.
+    """
     token = request.cookies.get("session_token")
     if not token: 
         return None
     conn = await get_db_connection()
     # Check admin users first (legacy password-based admins)
-    user = (await conn.execute("SELECT *, 'admin' as user_type FROM users WHERE api_key = ?", (token,))).cursor
+    await conn.execute("SELECT *, 'admin' as user_type, 0 as is_oauth, NULL as avatar_url FROM users WHERE api_key = ?", (token,))
     row = await conn.fetchone()
     if row:
         await conn.close()
         return row
     # Check OAuth users - role is now stored in database
-    await conn.execute("SELECT *, 'oauth' as user_type FROM oauth_users WHERE session_token = ?", (token,))
+    await conn.execute("SELECT *, 'oauth' as user_type, 1 as is_oauth FROM oauth_users WHERE session_token = ?", (token,))
     oauth_user = await conn.fetchone()
     await conn.close()
     return oauth_user
 
 
 async def get_oauth_user(request: Request):
-    """Get OAuth user only (not admin)."""
-    token = request.cookies.get("session_token")
-    if not token: 
-        return None
-    conn = await get_db_connection()
-    await conn.execute("SELECT * FROM oauth_users WHERE session_token = ?", (token,))
-    oauth_user = await conn.fetchone()
-    await conn.close()
-    return oauth_user
+    """Get OAuth user only (not admin).
+    
+    DEPRECATED: Use get_current_user() and check 'is_oauth' field instead.
+    Kept for backwards compatibility.
+    """
+    user = await get_current_user(request)
+    if user and user.get('is_oauth'):
+        return user
+    return None
 
 
 async def require_admin(request: Request):
@@ -246,6 +250,9 @@ API Key: {key}
             await cleanup_task
         except Exception:
             pass
+        # Close database connection pool on shutdown
+        from database import close_pool
+        await close_pool()
 
 
 # --- FastAPI App ---
@@ -407,13 +414,13 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     user = await get_current_user(request)
-    oauth_user = await get_oauth_user(request)
+    # User now includes is_oauth and avatar_url fields - no need for separate query
     return templates.TemplateResponse("index.html", {
         "request": request, 
         "user": user['username'] if user else None,
         "role": user['role'] if user else 'guest',
-        "oauth_avatar": oauth_user['avatar_url'] if oauth_user else None,
-        "is_oauth": oauth_user is not None
+        "oauth_avatar": user.get('avatar_url') if user else None,
+        "is_oauth": bool(user.get('is_oauth')) if user else False
     })
 
 
@@ -458,6 +465,57 @@ async def get_db_info(request: Request):
         info["database"] = MSSQL_DATABASE
     
     return info
+
+
+@app.get("/api/dashboard/init")
+async def dashboard_init(request: Request):
+    """Consolidated endpoint for initial dashboard data.
+    
+    Returns all data needed to initialize the dashboard in a single request,
+    reducing initial page load from 4 HTTP requests to 1.
+    """
+    user = await get_current_user(request)
+    is_admin = user and user.get('role') == 'admin'
+    
+    conn = await get_db_connection()
+    
+    # Always get models (public)
+    await conn.execute("SELECT * FROM models ORDER BY created_at DESC LIMIT 50")
+    models = await conn.fetchall()
+    
+    result = {
+        "models": [m.to_dict() for m in models],
+        "requests": [],
+        "tickets": [],
+        "my_requests": []
+    }
+    
+    if is_admin:
+        # Admin gets pending requests and open tickets
+        await conn.execute("SELECT * FROM requests WHERE status = 'pending' ORDER BY created_at DESC")
+        requests = await conn.fetchall()
+        result["requests"] = [r.to_dict() for r in requests]
+        
+        await conn.execute("""
+            SELECT t.*, r.hf_repo_id, r.requested_by 
+            FROM tickets t 
+            JOIN requests r ON t.request_id = r.id 
+            WHERE t.status = 'open'
+            ORDER BY t.created_at DESC
+        """)
+        tickets = await conn.fetchall()
+        result["tickets"] = [t.to_dict() for t in tickets]
+    elif user:
+        # Regular user gets their own requests
+        await conn.execute(
+            "SELECT * FROM requests WHERE requested_by = ? ORDER BY created_at DESC",
+            (user['username'],)
+        )
+        my_requests = await conn.fetchall()
+        result["my_requests"] = [r.to_dict() for r in my_requests]
+    
+    await conn.close()
+    return result
 
 
 if __name__ == "__main__":

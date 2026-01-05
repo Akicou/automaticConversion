@@ -35,6 +35,58 @@ RETRY_DELAY = 1.0  # seconds
 # Admin Users - comma-separated list of HuggingFace usernames who should be admins
 ADMIN_USERS = [u.strip().lower() for u in os.getenv("ADMIN_USERS", "").split(",") if u.strip()]
 
+# Connection pool settings
+POOL_MIN_SIZE = int(os.getenv("DB_POOL_MIN", "2"))
+POOL_MAX_SIZE = int(os.getenv("DB_POOL_MAX", "10"))
+
+# Global connection pool (initialized on first use)
+_mssql_pool = None
+_pool_lock = asyncio.Lock()
+
+
+async def _get_mssql_pool():
+    """Get or create the MSSQL connection pool."""
+    global _mssql_pool
+    async with _pool_lock:
+        if _mssql_pool is None:
+            try:
+                import aioodbc
+                conn_str = AsyncMSSQLConnection._get_connection_string()
+                _mssql_pool = await aioodbc.create_pool(
+                    dsn=conn_str,
+                    minsize=POOL_MIN_SIZE,
+                    maxsize=POOL_MAX_SIZE,
+                    autocommit=False
+                )
+                logger.info(f"MSSQL connection pool created (min={POOL_MIN_SIZE}, max={POOL_MAX_SIZE})")
+            except ImportError as e:
+                error_msg = str(e)
+                if "libodbc" in error_msg:
+                    raise ImportError(
+                        "Missing ODBC system libraries. Please install unixODBC and the Microsoft ODBC Driver.\n\n"
+                        "On Ubuntu/Debian:\n"
+                        "  sudo apt-get update\n"
+                        "  sudo apt-get install -y unixodbc-dev unixodbc\n"
+                        "  curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -\n"
+                        "  curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list\n"
+                        "  sudo apt-get update\n"
+                        "  sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18\n\n"
+                        "Alternatively, switch to SQLite by setting DB_TYPE=sqlite in your environment.\n\n"
+                        f"Original error: {error_msg}"
+                    ) from e
+                raise
+        return _mssql_pool
+
+
+async def close_pool():
+    """Close the connection pool (call on shutdown)."""
+    global _mssql_pool
+    if _mssql_pool:
+        _mssql_pool.close()
+        await _mssql_pool.wait_closed()
+        _mssql_pool = None
+        logger.info("MSSQL connection pool closed")
+
 
 def is_admin_user(username: str) -> bool:
     """Check if a username is in the admin list."""
@@ -238,8 +290,9 @@ class AsyncMSSQLConnection(AsyncDatabaseConnection):
             f"Login Timeout={MSSQL_LOGIN_TIMEOUT};"
         )
     
-    def __init__(self, conn):
+    def __init__(self, conn, pool=None):
         self.conn = conn
+        self._pool = pool  # Reference to pool for releasing connection
         self.cursor = None
         self._columns = []
         self._last_id = 0
@@ -421,7 +474,11 @@ class AsyncMSSQLConnection(AsyncDatabaseConnection):
         await self.conn.commit()
     
     async def close(self):
-        await self.conn.close()
+        """Release connection back to pool or close it."""
+        if self._pool:
+            await self._pool.release(self.conn)
+        else:
+            await self.conn.close()
     
     async def fetchone(self) -> Optional[DatabaseRow]:
         if self.cursor:
@@ -442,30 +499,15 @@ class AsyncMSSQLConnection(AsyncDatabaseConnection):
 
 
 async def get_db_connection() -> AsyncDatabaseConnection:
-    """Get an async database connection based on configuration."""
+    """Get an async database connection based on configuration.
+    
+    For MSSQL, connections are acquired from a pool for better performance.
+    For SQLite, a new connection is created (SQLite doesn't need pooling).
+    """
     if DB_TYPE == "mssql":
-        try:
-            import aioodbc
-        except ImportError as e:
-            error_msg = str(e)
-            if "libodbc" in error_msg:
-                raise ImportError(
-                    "Missing ODBC system libraries. Please install unixODBC and the Microsoft ODBC Driver.\n\n"
-                    "On Ubuntu/Debian:\n"
-                    "  sudo apt-get update\n"
-                    "  sudo apt-get install -y unixodbc-dev unixodbc\n"
-                    "  curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -\n"
-                    "  curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list\n"
-                    "  sudo apt-get update\n"
-                    "  sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18\n\n"
-                    "Alternatively, switch to SQLite by setting DB_TYPE=sqlite in your environment.\n\n"
-                    f"Original error: {error_msg}"
-                ) from e
-            raise
-        
-        conn_str = AsyncMSSQLConnection._get_connection_string()
-        conn = await aioodbc.connect(dsn=conn_str)
-        return AsyncMSSQLConnection(conn)
+        pool = await _get_mssql_pool()
+        conn = await pool.acquire()
+        return AsyncMSSQLConnection(conn, pool=pool)
     else:
         import aiosqlite
         conn = await aiosqlite.connect(DB_PATH)
@@ -576,8 +618,18 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
         )
     ''')
     
-    # Migration: Add decline_reason column if it doesn't exist (handled by IF NOT EXISTS in schema)
-    # Migration: Add role column to oauth_users if it doesn't exist (handled by IF NOT EXISTS in schema)
+    # Performance indexes for frequently queried columns
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_models_status ON models(status)')
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_models_hf_repo_id ON models(hf_repo_id)')
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_models_created_at ON models(created_at DESC)')
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status)')
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_requests_requested_by ON requests(requested_by)')
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at DESC)')
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)')
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_tickets_request_id ON tickets(request_id)')
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket_id ON ticket_messages(ticket_id)')
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_oauth_users_session_token ON oauth_users(session_token)')
+    await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key)')
 
 
 async def _init_mssql_tables(conn: AsyncDatabaseConnection):
@@ -690,6 +742,27 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
         )
     ''')
     await conn.commit()
+    
+    # Performance indexes for frequently queried columns
+    index_queries = [
+        "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_models_status') CREATE INDEX idx_models_status ON models(status)",
+        "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_models_hf_repo_id') CREATE INDEX idx_models_hf_repo_id ON models(hf_repo_id)",
+        "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_models_created_at') CREATE INDEX idx_models_created_at ON models(created_at DESC)",
+        "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_requests_status') CREATE INDEX idx_requests_status ON requests(status)",
+        "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_requests_requested_by') CREATE INDEX idx_requests_requested_by ON requests(requested_by)",
+        "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_requests_created_at') CREATE INDEX idx_requests_created_at ON requests(created_at DESC)",
+        "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tickets_status') CREATE INDEX idx_tickets_status ON tickets(status)",
+        "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tickets_request_id') CREATE INDEX idx_tickets_request_id ON tickets(request_id)",
+        "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_ticket_messages_ticket_id') CREATE INDEX idx_ticket_messages_ticket_id ON ticket_messages(ticket_id)",
+        "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_oauth_users_session_token') CREATE INDEX idx_oauth_users_session_token ON oauth_users(session_token)",
+        "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_api_key') CREATE INDEX idx_users_api_key ON users(api_key)",
+    ]
+    for query in index_queries:
+        try:
+            await conn.execute(query)
+            await conn.commit()
+        except:
+            pass  # Index might already exist
 
 
 async def test_connection() -> tuple[bool, str]:

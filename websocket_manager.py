@@ -105,21 +105,53 @@ async def broadcast_models_list(models: list):
 
 
 async def broadcast_requests_update():
-    """Signal clients to refresh requests."""
+    """Broadcast pending requests list to admin clients.
+    
+    Sends actual data instead of just a signal to avoid HTTP refetch.
+    """
+    from database import get_db_connection
+    
+    conn = await get_db_connection()
+    await conn.execute("SELECT * FROM requests WHERE status = 'pending' ORDER BY created_at DESC")
+    requests = await conn.fetchall()
+    await conn.close()
+    
     await manager.broadcast("requests", {
-        "type": "requests_update"
+        "type": "requests_list",
+        "requests": [r.to_dict() for r in requests]
     })
 
 
 async def broadcast_tickets_update():
-    """Signal clients to refresh tickets."""
+    """Broadcast open tickets list to admin clients.
+    
+    Sends actual data instead of just a signal to avoid HTTP refetch.
+    """
+    from database import get_db_connection
+    
+    conn = await get_db_connection()
+    await conn.execute("""
+        SELECT t.*, r.hf_repo_id, r.requested_by 
+        FROM tickets t 
+        JOIN requests r ON t.request_id = r.id 
+        WHERE t.status = 'open'
+        ORDER BY t.created_at DESC
+    """)
+    tickets = await conn.fetchall()
+    await conn.close()
+    
     await manager.broadcast("tickets", {
-        "type": "tickets_update"
+        "type": "tickets_list",
+        "tickets": [t.to_dict() for t in tickets]
     })
 
 
 async def broadcast_my_requests_update():
-    """Signal clients to refresh their own requests."""
+    """Signal clients to refresh their own requests.
+    
+    Note: This one still sends a signal because user-specific requests
+    require knowing the current user context which isn't available here.
+    """
     await manager.broadcast("my_requests", {
         "type": "my_requests_update"
     })
