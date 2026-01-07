@@ -576,9 +576,21 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
             requested_by TEXT,
             status TEXT DEFAULT 'pending',
             decline_reason TEXT DEFAULT '',
+            requested_quants TEXT DEFAULT '',
+            approved_quants TEXT DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # Migration: Add quant columns if they don't exist (for existing databases)
+    try:
+        await conn.execute("ALTER TABLE requests ADD COLUMN requested_quants TEXT DEFAULT ''")
+    except:
+        pass  # Column already exists
+    try:
+        await conn.execute("ALTER TABLE requests ADD COLUMN approved_quants TEXT DEFAULT ''")
+    except:
+        pass  # Column already exists
     
     # OAuth users table
     await conn.execute('''
@@ -684,10 +696,30 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
             requested_by NVARCHAR(255),
             status NVARCHAR(50) DEFAULT 'pending',
             decline_reason NVARCHAR(MAX) DEFAULT '',
+            requested_quants NVARCHAR(MAX) DEFAULT '',
+            approved_quants NVARCHAR(MAX) DEFAULT '',
             created_at DATETIME DEFAULT GETDATE()
         )
     ''')
     await conn.commit()
+    
+    # Migration: Add quant columns if they don't exist
+    try:
+        await conn.execute('''
+            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'requests' AND COLUMN_NAME = 'requested_quants')
+            ALTER TABLE requests ADD requested_quants NVARCHAR(MAX) DEFAULT ''
+        ''')
+        await conn.commit()
+    except:
+        pass
+    try:
+        await conn.execute('''
+            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'requests' AND COLUMN_NAME = 'approved_quants')
+            ALTER TABLE requests ADD approved_quants NVARCHAR(MAX) DEFAULT ''
+        ''')
+        await conn.commit()
+    except:
+        pass
     
     # OAuth users table
     await conn.execute('''

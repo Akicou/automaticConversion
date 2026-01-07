@@ -9,9 +9,11 @@ A modern, glassmorphic FastAPI application to automate the conversion of Hugging
 ### Core Features
 - **HuggingFace OAuth**: Guest login with HuggingFace for requesting conversions
 - **Request System**: Users can request model conversions, admins approve/decline with reasons
+- **Quant Selection**: Users can request specific quantization types; admins can modify the selection
 - **Dashboard**: Real-time status of model conversions with detailed logs
 - **Model Search**: Search HuggingFace models with autocomplete
-- **Auto-Pipeline**: Download → Convert (FP16) → Quantize (All levels) → Upload
+- **Auto-Pipeline**: Download → Convert (FP16) → Quantize (Selected levels) → Upload
+- **Configurable Storage**: Set custom download path for models (local, external drive, or HF_HOME)
 - **Async Processing**: Non-blocking quantization and concurrent uploads
 - **Time Tracking**: Detailed timing stats for each conversion step
 - **Version Tracking**: Auto-calculated version based on git commits
@@ -142,6 +144,26 @@ You can also set these environment variables (they have defaults):
     - Each job gets an equal share of CPU cores (e.g., 16 cores ÷ 2 jobs = 8 cores each)
     - Higher values speed up conversion but require more RAM and may cause CPU/IO contention
     - Recommended: `2` for 8-16 cores, `4` for 24+ cores with 64GB+ RAM
+
+### Model Storage Configuration
+
+Configure where models are downloaded and processed:
+
+```env
+# Model Download Path (optional)
+# Supports absolute paths (D:\Models, /mnt/external) or relative paths (./models)
+MODEL_DOWNLOAD_PATH=/path/to/large/storage
+
+# Alternatively, HuggingFace's HF_HOME is used as fallback
+HF_HOME=/path/to/hf/cache
+```
+
+**Priority Order**: `MODEL_DOWNLOAD_PATH` > `HF_HOME` > default `.cache` folder
+
+This is useful when:
+- You have limited space on your system drive
+- You want to store models on an external drive or network storage
+- You want to share a cache with other HuggingFace applications
 
 ### Database Configuration
 
@@ -278,8 +300,35 @@ Response shows database status:
 2. Authorize the application
 3. Search for a model
 4. Click **Request** to submit a conversion request
-5. Wait for admin approval
-6. Check "My Requests" section for status updates
+5. **Optional**: Select specific quantization types you want (or leave empty for all)
+6. Wait for admin approval
+7. Check "My Requests" section for status updates
+
+### Quant Selection
+
+Users can request specific quantization types when submitting a conversion request:
+
+**Available Quant Types:**
+| Type | Description |
+|------|-------------|
+| Q2_K | 2-bit (smallest, lowest quality) |
+| Q3_K_S/M/L | 3-bit small/medium/large |
+| Q4_0 | 4-bit legacy |
+| Q4_K_S | 4-bit small (recommended for low memory) |
+| Q4_K_M | 4-bit medium (good balance) |
+| Q5_0 | 5-bit legacy |
+| Q5_K_S/M | 5-bit small/medium (good quality) |
+| Q6_K | 6-bit (high quality) |
+| Q8_0 | 8-bit (highest quality, largest size) |
+
+**Admin Quant Modification:**
+When approving a request, admins can:
+- Use the user's requested quants as-is
+- Add additional quant types
+- Remove unnecessary quant types
+- Override with a completely different selection
+
+If no quants are specified (by user or admin), all available quants are generated.
 
 ## Conversion Pipeline
 
@@ -371,8 +420,9 @@ If the server crashes during a conversion:
 ### Authenticated Endpoints
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/requests/submit` | POST | Submit a conversion request |
+| `/api/requests/submit` | POST | Submit a conversion request (with optional quants) |
 | `/api/requests/my` | GET | Get user's requests |
+| `/api/quants` | GET | Get available quantization types |
 | `/api/tickets/my` | GET | Get user's tickets |
 | `/api/tickets/{id}/messages` | GET | Get ticket messages |
 | `/api/tickets/{id}/reply` | POST | Reply to a ticket |
@@ -384,7 +434,7 @@ If the server crashes during a conversion:
 | `/api/models/process` | POST | Start a conversion directly |
 | `/api/models/{id}/terminate` | POST | Terminate a running job |
 | `/api/requests/all` | GET | View all requests |
-| `/api/requests/{id}/approve` | POST | Approve a request |
+| `/api/requests/{id}/approve` | POST | Approve a request (with optional quant override) |
 | `/api/requests/{id}/reject` | POST | Reject a request |
 | `/api/tickets/create` | POST | Create a discussion ticket |
 | `/api/tickets/all` | GET | View all tickets |

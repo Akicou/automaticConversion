@@ -61,7 +61,24 @@ else:
 
 TEMPLATES_DIR = BUNDLE_DIR / "templates"
 STATIC_DIR = BUNDLE_DIR / "static"
-CACHE_DIR = BASE_DIR / ".cache"
+
+# Model download path - configurable via MODEL_DOWNLOAD_PATH or HF_HOME environment variable
+# Priority: MODEL_DOWNLOAD_PATH > HF_HOME > default .cache folder
+model_download_env = os.getenv("MODEL_DOWNLOAD_PATH", "")
+hf_home_env = os.getenv("HF_HOME", "")
+if model_download_env:
+    # Use explicit MODEL_DOWNLOAD_PATH - support both relative and absolute paths
+    model_path = Path(model_download_env)
+    if model_path.is_absolute():
+        CACHE_DIR = model_path
+    else:
+        CACHE_DIR = (BASE_DIR / model_path).resolve()
+elif hf_home_env:
+    # Use HuggingFace home directory
+    CACHE_DIR = Path(hf_home_env) / "gguf-forge"
+else:
+    # Default: .cache subdirectory
+    CACHE_DIR = BASE_DIR / ".cache"
 
 # Llama.cpp directory - configurable via LLAMA_CPP_DIR environment variable
 llama_cpp_env = os.getenv("LLAMA_CPP_DIR", "")
@@ -79,9 +96,9 @@ else:
 
 DB_PATH = BASE_DIR / "gguf_app.db"
 
-CACHE_DIR.mkdir(exist_ok=True)
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-# Llama.cpp Constants
+# Llama.cpp Constants - available quant types
 QUANTS = ["Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L", "Q4_0", "Q4_K_S", "Q4_K_M", "Q5_0", "Q5_K_S", "Q5_K_M", "Q6_K", "Q8_0"]
 PARALLEL_QUANT_JOBS = int(os.getenv("PARALLEL_QUANT_JOBS", "2"))
 
@@ -465,6 +482,28 @@ async def get_db_info(request: Request):
         info["database"] = MSSQL_DATABASE
     
     return info
+
+
+@app.get("/api/quants")
+async def get_available_quants():
+    """Get list of available quantization types."""
+    return {
+        "quants": QUANTS,
+        "descriptions": {
+            "Q2_K": "2-bit quantization (smallest, lowest quality)",
+            "Q3_K_S": "3-bit small quantization",
+            "Q3_K_M": "3-bit medium quantization",
+            "Q3_K_L": "3-bit large quantization",
+            "Q4_0": "4-bit legacy quantization",
+            "Q4_K_S": "4-bit small quantization (recommended for low memory)",
+            "Q4_K_M": "4-bit medium quantization (good balance)",
+            "Q5_0": "5-bit legacy quantization",
+            "Q5_K_S": "5-bit small quantization",
+            "Q5_K_M": "5-bit medium quantization (good quality)",
+            "Q6_K": "6-bit quantization (high quality)",
+            "Q8_0": "8-bit quantization (highest quality, largest size)"
+        }
+    }
 
 
 @app.get("/api/dashboard/init")

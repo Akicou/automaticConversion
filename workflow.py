@@ -44,7 +44,8 @@ def get_quants_list():
 
 
 class ModelWorkflow:
-    def __init__(self, model_id: str, hf_repo_id: str, resume_mode: bool = False, completed_quants: Optional[List[str]] = None):
+    def __init__(self, model_id: str, hf_repo_id: str, resume_mode: bool = False, 
+                 completed_quants: Optional[List[str]] = None, quants_to_run: Optional[List[str]] = None):
         self.model_id = model_id
         self.hf_repo_id = hf_repo_id
         self.log_buffer = []
@@ -63,6 +64,8 @@ class ModelWorkflow:
         # Resume support
         self.resume_mode = resume_mode
         self.completed_quants: List[str] = completed_quants or []  # Quants that have been uploaded already
+        # Custom quants - if specified, only these quants will be processed
+        self.quants_to_run: List[str] = quants_to_run if quants_to_run else QUANTS
         # For tracking the HF repo (needed for resume)
         self.new_repo_id = None
         self.hf_token = None
@@ -444,8 +447,8 @@ class ModelWorkflow:
             await self.log("")
             uploaded_files = []  # List of quant types that were uploaded
             
-            # Determine which quants to process (skip already completed ones in resume mode)
-            quants_to_process = [q for q in QUANTS if q not in self.completed_quants]
+            # Determine which quants to process (use custom list if set, skip already completed ones)
+            quants_to_process = [q for q in self.quants_to_run if q not in self.completed_quants]
             
             if self.resume_mode and self.completed_quants:
                 await self.log(f"  📋 Resume mode: {len(self.completed_quants)} quants already completed")
@@ -453,8 +456,12 @@ class ModelWorkflow:
                 await self.log(f"     Remaining: {len(quants_to_process)} quants to process")
                 uploaded_files = list(self.completed_quants)  # Count already uploaded as successful
                 await self.log("")
+            elif len(self.quants_to_run) < len(QUANTS):
+                # User requested specific quants
+                await self.log(f"  📋 Custom quants requested: {', '.join(self.quants_to_run)}")
+                await self.log("")
             
-            total_quants = len(QUANTS)
+            total_quants = len(self.quants_to_run)
             completed_count = len(self.completed_quants)
             
             # Detect CPU cores
@@ -467,7 +474,7 @@ class ModelWorkflow:
             for idx, q_type in enumerate(quants_to_process):
                 self.check_terminated()
                 
-                overall_idx = QUANTS.index(q_type) + 1
+                overall_idx = self.quants_to_run.index(q_type) + 1
                 await self.log(f"  [{overall_idx}/{total_quants}] Processing {q_type}...")
                 
                 q_path = CACHE_DIR / f"{quant_base_name}.{q_type}.gguf"

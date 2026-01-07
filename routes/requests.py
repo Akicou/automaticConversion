@@ -2,12 +2,13 @@
 Request system routes for GGUF Forge.
 """
 import uuid
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 
 from database import get_db_connection
-from models import ModelRequestSubmit, RejectRequest
-from workflow import ModelWorkflow
+from models import ModelRequestSubmit, RejectRequest, ApproveRequestBody
+from workflow import ModelWorkflow, get_quants_list
 from websocket_manager import broadcast_requests_update, broadcast_my_requests_update
 
 router = APIRouter(prefix="/api/requests")
@@ -33,6 +34,14 @@ async def get_admin(request: Request):
     raise HTTPException(status_code=500, detail="Admin dependency not configured")
 
 
+def validate_quants(quants: list) -> list:
+    """Validate quant names against available quants. Returns valid quants only."""
+    available = get_quants_list()
+    if not quants:
+        return []
+    return [q for q in quants if q in available]
+
+
 @router.post("/submit")
 async def submit_request(req: ModelRequestSubmit, request: Request):
     """Submit a request for a model to be converted (requires login)."""
@@ -54,6 +63,10 @@ async def submit_request(req: ModelRequestSubmit, request: Request):
     if not allowed:
         raise HTTPException(status_code=429, detail=reason)
     
+    # Validate requested quants
+    requested_quants = validate_quants(req.requested_quants) if req.requested_quants else []
+    requested_quants_json = json.dumps(requested_quants) if requested_quants else ""
+    
     conn = await get_db_connection()
     # Check if already requested
     await conn.execute("SELECT * FROM requests WHERE hf_repo_id = ? AND status = 'pending'", (req.hf_repo_id,))
@@ -63,8 +76,8 @@ async def submit_request(req: ModelRequestSubmit, request: Request):
         return {"status": "already_requested", "message": "This model has already been requested."}
     
     await conn.execute(
-        "INSERT INTO requests (hf_repo_id, requested_by, status) VALUES (?, ?, ?)",
-        (req.hf_repo_id, requester, "pending")
+        "INSERT INTO requests (hf_repo_id, requested_by, status, requested_quants) VALUES (?, ?, ?, ?)",
+        (req.hf_repo_id, requester, "pending", requested_quants_json)
     )
     await conn.commit()
     await conn.close()
@@ -76,7 +89,8 @@ async def submit_request(req: ModelRequestSubmit, request: Request):
     await broadcast_requests_update()
     await broadcast_my_requests_update()
     
-    return {"status": "submitted", "message": "Your request has been submitted for admin review."}
+    quant_msg = f" with quants: {', '.join(requested_quants)}" if requested_quants else " (all quants)"
+    return {"status": "submitted", "message": f"Your request has been submitted for admin review{quant_msg}."}
 
 
 @router.get("/all")
@@ -87,12 +101,44 @@ async def get_all_requests(user = Depends(get_admin)):
     await conn.execute("SELECT * FROM requests WHERE status = 'pending' ORDER BY created_at DESC")
     requests = await conn.fetchall()
     await conn.close()
-    return [r.to_dict() for r in requests]
+    
+    # Parse quant JSON for each request
+    result = []
+    for r in requests:
+        r_dict = r.to_dict()
+        # Parse requested_quants JSON if present
+        if r_dict.get('requested_quants'):
+            try:
+                r_dict['requested_quants'] = json.loads(r_dict['requested_quants'])
+            except:
+                r_dict['requested_quants'] = []
+        else:
+            r_dict['requested_quants'] = []
+        # Parse approved_quants JSON if present
+        if r_dict.get('approved_quants'):
+            try:
+                r_dict['approved_quants'] = json.loads(r_dict['approved_quants'])
+            except:
+                r_dict['approved_quants'] = []
+        else:
+            r_dict['approved_quants'] = []
+        result.append(r_dict)
+    
+    return result
 
 
 @router.post("/{request_id}/approve")
-async def approve_request(request_id: int, background_tasks: BackgroundTasks, user = Depends(get_admin)):
-    """Admin only: Approve a request and start conversion."""
+async def approve_request(
+    request_id: int, 
+    background_tasks: BackgroundTasks, 
+    body: ApproveRequestBody = None,
+    user = Depends(get_admin)
+):
+    """Admin only: Approve a request and start conversion.
+    
+    Admin can optionally modify the quant selection via body.approved_quants.
+    If not provided, uses the user's requested_quants or all quants if empty.
+    """
     conn = await get_db_connection()
     await conn.execute("SELECT * FROM requests WHERE id = ?", (request_id,))
     req = await conn.fetchone()
@@ -101,8 +147,39 @@ async def approve_request(request_id: int, background_tasks: BackgroundTasks, us
         await conn.close()
         raise HTTPException(status_code=404, detail="Request not found")
     
-    # Update request status
-    await conn.execute("UPDATE requests SET status = 'approved' WHERE id = ?", (request_id,))
+    # Determine which quants to use
+    available_quants = get_quants_list()
+    
+    # Priority: admin override > user request > all quants
+    if body and body.approved_quants:
+        # Admin explicitly set quants
+        approved_quants = validate_quants(body.approved_quants)
+        if not approved_quants:
+            await conn.close()
+            raise HTTPException(status_code=400, detail="No valid quants specified")
+    else:
+        # Use user's requested quants if available
+        user_quants_json = req.get('requested_quants', '')
+        if user_quants_json:
+            try:
+                user_quants = json.loads(user_quants_json)
+                approved_quants = validate_quants(user_quants)
+            except:
+                approved_quants = []
+        else:
+            approved_quants = []
+        
+        # If no specific quants requested, use all
+        if not approved_quants:
+            approved_quants = available_quants
+    
+    approved_quants_json = json.dumps(approved_quants)
+    
+    # Update request status and approved quants
+    await conn.execute(
+        "UPDATE requests SET status = 'approved', approved_quants = ? WHERE id = ?", 
+        (approved_quants_json, request_id)
+    )
     await conn.commit()
     
     # Start the conversion
@@ -110,19 +187,20 @@ async def approve_request(request_id: int, background_tasks: BackgroundTasks, us
     new_id = str(uuid.uuid4())
     await conn.execute(
         "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details) VALUES (?, ?, ?, ?, ?, ?)",
-        (new_id, hf_repo_id, "pending", 0, "Queued from approved request...", "")
+        (new_id, hf_repo_id, "pending", 0, f"Queued from approved request... Quants: {', '.join(approved_quants)}", "")
     )
     await conn.commit()
     await conn.close()
     
-    workflow = ModelWorkflow(new_id, hf_repo_id)
+    # Pass approved quants to workflow
+    workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants)
     background_tasks.add_task(workflow.run_pipeline)
     
     # Broadcast update via WebSocket
     await broadcast_requests_update()
     await broadcast_my_requests_update()
     
-    return {"status": "approved", "model_id": new_id}
+    return {"status": "approved", "model_id": new_id, "quants": approved_quants}
 
 
 @router.post("/{request_id}/reject")
@@ -156,4 +234,25 @@ async def get_my_requests(request: Request):
     )
     requests = await conn.fetchall()
     await conn.close()
-    return [r.to_dict() for r in requests]
+    
+    # Parse quant JSON for each request
+    result = []
+    for r in requests:
+        r_dict = r.to_dict()
+        if r_dict.get('requested_quants'):
+            try:
+                r_dict['requested_quants'] = json.loads(r_dict['requested_quants'])
+            except:
+                r_dict['requested_quants'] = []
+        else:
+            r_dict['requested_quants'] = []
+        if r_dict.get('approved_quants'):
+            try:
+                r_dict['approved_quants'] = json.loads(r_dict['approved_quants'])
+            except:
+                r_dict['approved_quants'] = []
+        else:
+            r_dict['approved_quants'] = []
+        result.append(r_dict)
+    
+    return result
