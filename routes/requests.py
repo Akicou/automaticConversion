@@ -175,6 +175,9 @@ async def approve_request(
     
     approved_quants_json = json.dumps(approved_quants)
     
+    # Get ignore_space_check flag from request body (admin only)
+    ignore_space_check = body.ignore_space_check if body and body.ignore_space_check else False
+    
     # Update request status and approved quants
     await conn.execute(
         "UPDATE requests SET status = 'approved', approved_quants = ? WHERE id = ?", 
@@ -185,15 +188,21 @@ async def approve_request(
     # Start the conversion
     hf_repo_id = req['hf_repo_id']
     new_id = str(uuid.uuid4())
+    
+    # Build initial log message
+    log_msg = f"Queued from approved request... Quants: {', '.join(approved_quants)}"
+    if ignore_space_check:
+        log_msg += "\n⚠ Admin override: Space check disabled"
+    
     await conn.execute(
-        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details) VALUES (?, ?, ?, ?, ?, ?)",
-        (new_id, hf_repo_id, "pending", 0, f"Queued from approved request... Quants: {', '.join(approved_quants)}", "")
+        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, ignore_space_check) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (new_id, hf_repo_id, "pending", 0, log_msg, "", 1 if ignore_space_check else 0)
     )
     await conn.commit()
     await conn.close()
     
-    # Pass approved quants to workflow
-    workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants)
+    # Pass approved quants and space check flag to workflow
+    workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants, ignore_space_check=ignore_space_check)
     background_tasks.add_task(workflow.run_pipeline)
     
     # Broadcast update via WebSocket

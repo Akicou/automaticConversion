@@ -23,6 +23,7 @@ class ModelRequestSubmit(BaseModel):
 class ApproveRequestBody(BaseModel):
     """Admin can optionally modify quant selection when approving."""
     approved_quants: Optional[List[str]] = None  # If None, uses requested_quants or all quants
+    ignore_space_check: Optional[bool] = False  # If True, bypass conservative disk space checks
 
 
 class RejectRequest(BaseModel):

@@ -558,13 +558,20 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
             error_details TEXT DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             completed_at DATETIME,
-            completed_quants TEXT DEFAULT ''
+            completed_quants TEXT DEFAULT '',
+            ignore_space_check INTEGER DEFAULT 0
         )
     ''')
     
     # Migration: Add completed_quants column if it doesn't exist
     try:
         await conn.execute("ALTER TABLE models ADD COLUMN completed_quants TEXT DEFAULT ''")
+    except:
+        pass  # Column already exists
+    
+    # Migration: Add ignore_space_check column if it doesn't exist
+    try:
+        await conn.execute("ALTER TABLE models ADD COLUMN ignore_space_check INTEGER DEFAULT 0")
     except:
         pass  # Column already exists
     
@@ -672,7 +679,8 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
             error_details NVARCHAR(MAX) DEFAULT '',
             created_at DATETIME DEFAULT GETDATE(),
             completed_at DATETIME,
-            completed_quants NVARCHAR(MAX) DEFAULT ''
+            completed_quants NVARCHAR(MAX) DEFAULT '',
+            ignore_space_check BIT DEFAULT 0
         )
     ''')
     await conn.commit()
@@ -682,6 +690,16 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
         await conn.execute('''
             IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'completed_quants')
             ALTER TABLE models ADD completed_quants NVARCHAR(MAX) DEFAULT ''
+        ''')
+        await conn.commit()
+    except:
+        pass
+    
+    # Migration: Add ignore_space_check column if it doesn't exist
+    try:
+        await conn.execute('''
+            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'ignore_space_check')
+            ALTER TABLE models ADD ignore_space_check BIT DEFAULT 0
         ''')
         await conn.commit()
     except:

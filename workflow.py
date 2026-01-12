@@ -45,7 +45,8 @@ def get_quants_list():
 
 class ModelWorkflow:
     def __init__(self, model_id: str, hf_repo_id: str, resume_mode: bool = False, 
-                 completed_quants: Optional[List[str]] = None, quants_to_run: Optional[List[str]] = None):
+                 completed_quants: Optional[List[str]] = None, quants_to_run: Optional[List[str]] = None,
+                 ignore_space_check: bool = False):
         self.model_id = model_id
         self.hf_repo_id = hf_repo_id
         self.log_buffer = []
@@ -70,6 +71,8 @@ class ModelWorkflow:
         self.new_repo_id = None
         self.hf_token = None
         self.api = None
+        # Admin override - skip conservative disk space checks
+        self.ignore_space_check = ignore_space_check
     
     async def terminate(self):
         """Request termination of this workflow."""
@@ -203,6 +206,13 @@ class ModelWorkflow:
         loop = asyncio.get_event_loop()
         total, used, free = await loop.run_in_executor(None, shutil.disk_usage, CACHE_DIR)
         free_gb = free / (2**30)
+        
+        if self.ignore_space_check:
+            await self.log(f"  ⚠ Space check BYPASSED by admin (Available: {free_gb:.1f}GB)")
+            await self.log(f"  ⚠ Original requirement was: {required_gb:.1f}GB")
+            await self.log(f"  ℹ Sequential processing requires much less space than conservative estimate")
+            return
+        
         await self.log(f"  Disk space check: Need {required_gb:.1f}GB, Available {free_gb:.1f}GB")
         if free_gb < required_gb:
             raise Exception(f"Insufficient disk space. Required: {required_gb:.1f}GB, Available: {free_gb:.1f}GB")

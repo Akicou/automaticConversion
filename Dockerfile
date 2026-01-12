@@ -40,6 +40,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Required for some Python packages
     libffi-dev \
     libssl-dev \
+    gnupg \
     # Cleanup apt cache
     && rm -rf /var/lib/apt/lists/*
 

@@ -301,7 +301,8 @@
 
     {% if role == 'admin' %}
     <!-- Admin Controls Bar -->
-    <div id="admin-controls" style="margin-bottom: 1.5rem; display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
+    <div id="admin-controls"
+        style="margin-bottom: 1.5rem; display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
         <div id="update-status" style="font-size: 0.75rem; color: var(--text-secondary);"></div>
         <button id="update-app-btn" onclick="performAppUpdate()" disabled
             style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: not-allowed; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; opacity: 0.5;">
@@ -339,27 +340,34 @@
             </label>
         </div>
         {% endif %}
-        
+
         <!-- Quant Selection Panel -->
         <div style="margin-top: 1rem;">
-            <button type="button" id="quant-toggle" onclick="toggleQuantSelector()" 
+            <button type="button" id="quant-toggle" onclick="toggleQuantSelector()"
                 style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
                 <span id="quant-toggle-icon">▶</span>
                 <span>Select Quants <span style="opacity: 0.7;">(optional - defaults to all)</span></span>
             </button>
-            <div id="quant-selector" style="display: none; margin-top: 0.75rem; padding: 1rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 8px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <div id="quant-selector"
+                style="display: none; margin-top: 0.75rem; padding: 1rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 8px;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                     <span style="font-size: 0.8rem; color: var(--text-secondary);">Select quantization formats:</span>
                     <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" onclick="selectAllQuants()" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">All</button>
-                        <button type="button" onclick="selectNoQuants()" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">None</button>
-                        <button type="button" onclick="selectRecommendedQuants()" style="background: transparent; border: 1px solid var(--success); color: var(--success); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">Recommended</button>
+                        <button type="button" onclick="selectAllQuants()"
+                            style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">All</button>
+                        <button type="button" onclick="selectNoQuants()"
+                            style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">None</button>
+                        <button type="button" onclick="selectRecommendedQuants()"
+                            style="background: transparent; border: 1px solid var(--success); color: var(--success); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">Recommended</button>
                     </div>
                 </div>
-                <div id="quant-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.5rem;">
+                <div id="quant-checkboxes"
+                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.5rem;">
                     <!-- Populated by JavaScript -->
                 </div>
-                <div id="quant-selected-count" style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);"></div>
+                <div id="quant-selected-count"
+                    style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);"></div>
             </div>
         </div>
     </div>
@@ -475,25 +483,42 @@
         </div>
         <!-- Requested quants display -->
         <div class="requested-quants-row" style="margin-bottom: 0.75rem;">
-            <div class="requested-quants-label" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem;">
+            <div class="requested-quants-label"
+                style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem;">
                 Requested quants: <span class="requested-quants-value" style="color: var(--text-primary);"></span>
             </div>
-            <button type="button" class="edit-quants-btn" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">
+            <button type="button" class="edit-quants-btn"
+                style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">
                 ✏️ Edit quants before approving
             </button>
         </div>
         <!-- Inline quant selector for admin -->
-        <div class="request-quant-selector" style="display: none; margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 6px;">
+        <div class="request-quant-selector"
+            style="display: none; margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 6px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                 <span style="font-size: 0.75rem; color: var(--text-secondary);">Modify quants to generate:</span>
                 <div style="display: flex; gap: 0.4rem;">
-                    <button type="button" class="req-select-all" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">All</button>
-                    <button type="button" class="req-select-none" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">None</button>
-                    <button type="button" class="req-select-user" style="background: transparent; border: 1px solid #60a5fa; color: #60a5fa; padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">User's</button>
+                    <button type="button" class="req-select-all"
+                        style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">All</button>
+                    <button type="button" class="req-select-none"
+                        style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">None</button>
+                    <button type="button" class="req-select-user"
+                        style="background: transparent; border: 1px solid #60a5fa; color: #60a5fa; padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">User's</button>
                 </div>
             </div>
-            <div class="request-quant-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 0.3rem;"></div>
-            <div class="request-quant-count" style="margin-top: 0.5rem; font-size: 0.7rem; color: var(--text-secondary);"></div>
+            <div class="request-quant-checkboxes"
+                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 0.3rem;"></div>
+            <div class="request-quant-count"
+                style="margin-top: 0.5rem; font-size: 0.7rem; color: var(--text-secondary);"></div>
+        </div>
+        <!-- Admin option to bypass space check -->
+        <div style="margin-bottom: 0.75rem;">
+            <label
+                style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer;">
+                <input type="checkbox" class="ignore-space-check" style="accent-color: #ff8c00; cursor: pointer;">
+                <span>⚠ Ignore space check <span style="opacity: 0.7; font-size: 0.7rem;">(advanced: bypasses 3x model
+                        size requirement)</span></span>
+            </label>
         </div>
         <div class="decline-reason-row" style="display: flex; gap: 0.5rem; align-items: center;">
             <input type="text" class="decline-reason-input" placeholder="Message (for discussion or decline reason)..."
@@ -549,12 +574,12 @@
     const searchInput = document.getElementById('modelSearch');
     const suggestionsBox = document.getElementById('suggestions');
     const isAdmin = '{{ role }}' === 'admin';
-    
+
     // ====== QUANT SELECTOR ======
     let availableQuants = [];
     let quantDescriptions = {};
     const recommendedQuants = ['Q4_K_M', 'Q5_K_M', 'Q6_K', 'Q8_0'];
-    
+
     async function loadAvailableQuants() {
         try {
             const res = await fetch('/api/quants');
@@ -566,11 +591,11 @@
             console.error('Failed to load quants:', e);
         }
     }
-    
+
     function renderQuantCheckboxes() {
         const container = document.getElementById('quant-checkboxes');
         if (!container) return;
-        
+
         container.innerHTML = '';
         availableQuants.forEach(quant => {
             const label = document.createElement('label');
@@ -586,7 +611,7 @@
         });
         updateQuantCount();
     }
-    
+
     function toggleQuantSelector() {
         const selector = document.getElementById('quant-selector');
         const icon = document.getElementById('quant-toggle-icon');
@@ -598,36 +623,36 @@
             icon.textContent = '▶';
         }
     }
-    
+
     function getSelectedQuants() {
         const checkboxes = document.querySelectorAll('.quant-checkbox:checked');
         return Array.from(checkboxes).map(cb => cb.value);
     }
-    
+
     function selectAllQuants() {
         document.querySelectorAll('.quant-checkbox').forEach(cb => cb.checked = true);
         updateQuantCount();
     }
-    
+
     function selectNoQuants() {
         document.querySelectorAll('.quant-checkbox').forEach(cb => cb.checked = false);
         updateQuantCount();
     }
-    
+
     function selectRecommendedQuants() {
         document.querySelectorAll('.quant-checkbox').forEach(cb => {
             cb.checked = recommendedQuants.includes(cb.value);
         });
         updateQuantCount();
     }
-    
+
     function setSelectedQuants(quants) {
         document.querySelectorAll('.quant-checkbox').forEach(cb => {
             cb.checked = quants.includes(cb.value);
         });
         updateQuantCount();
     }
-    
+
     function updateQuantCount() {
         const selected = getSelectedQuants();
         const countEl = document.getElementById('quant-selected-count');
@@ -641,37 +666,37 @@
             }
         }
     }
-    
+
     // Load quants on page load
     loadAvailableQuants();
-    
+
     // ====== APP UPDATE SYSTEM (Admin only) ======
     let updateAvailable = false;
     let updateInfo = null;
-    
+
     async function checkForAppUpdate() {
         if (!isAdmin) return;
-        
+
         const btn = document.getElementById('update-app-btn');
         const statusEl = document.getElementById('update-status');
         const btnText = document.getElementById('update-btn-text');
         const btnIcon = document.getElementById('update-btn-icon');
-        
+
         if (!btn) return;
-        
+
         try {
             const res = await fetch('/api/admin/check-update');
             const data = await res.json();
-            
+
             if (data.error) {
                 statusEl.textContent = 'Update check failed';
                 btnText.textContent = 'Update unavailable';
                 return;
             }
-            
+
             updateInfo = data;
             updateAvailable = data.update_available;
-            
+
             if (updateAvailable) {
                 btn.disabled = false;
                 btn.style.cursor = 'pointer';
@@ -699,34 +724,34 @@
             statusEl.textContent = 'Update check failed';
         }
     }
-    
+
     async function performAppUpdate() {
         if (!updateAvailable || !isAdmin) return;
-        
+
         const btn = document.getElementById('update-app-btn');
         const btnText = document.getElementById('update-btn-text');
         const btnIcon = document.getElementById('update-btn-icon');
         const statusEl = document.getElementById('update-status');
-        
+
         if (!confirm(`Update GGUF Forge?\n\nThis will:\n• Pull latest changes (${updateInfo.commits_behind} commits)\n• Restart the server\n\nAny running jobs will be interrupted.`)) {
             return;
         }
-        
+
         btn.disabled = true;
         btn.style.cursor = 'wait';
         btnIcon.textContent = '⏳';
         btnText.textContent = 'Updating...';
         statusEl.textContent = 'Pulling latest changes...';
-        
+
         try {
             const res = await fetch('/api/admin/update-app', { method: 'POST' });
             const data = await res.json();
-            
+
             if (data.status === 'success') {
                 btnIcon.textContent = '🔄';
                 btnText.textContent = 'Restarting...';
                 statusEl.innerHTML = '<span style="color: var(--success);">Update complete! Server restarting...</span>';
-                
+
                 // Poll for server to come back up
                 setTimeout(() => {
                     statusEl.textContent = 'Waiting for server...';
@@ -747,12 +772,12 @@
             setTimeout(() => pollServerRestart(), 2000);
         }
     }
-    
+
     async function pollServerRestart() {
         const statusEl = document.getElementById('update-status');
         let attempts = 0;
         const maxAttempts = 30;
-        
+
         const poll = async () => {
             attempts++;
             try {
@@ -765,7 +790,7 @@
             } catch (e) {
                 // Server not ready yet
             }
-            
+
             if (attempts < maxAttempts) {
                 statusEl.textContent = `Waiting for server... (${attempts}/${maxAttempts})`;
                 setTimeout(poll, 1000);
@@ -773,10 +798,10 @@
                 statusEl.innerHTML = '<span style="color: var(--error);">Server not responding. Please refresh manually.</span>';
             }
         };
-        
+
         poll();
     }
-    
+
     // Check for updates on page load (admin only)
     if (isAdmin) {
         setTimeout(checkForAppUpdate, 1000);
@@ -834,12 +859,12 @@
 
         // Collect selected quants (empty array means "all quants")
         const selectedQuants = getSelectedQuants();
-        
+
         try {
             const res = await fetch('/api/models/process', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     model_id: modelId,
                     quants: selectedQuants.length > 0 ? selectedQuants : null
                 })
@@ -867,12 +892,12 @@
 
         // Collect selected quants (empty array means "all quants")
         const selectedQuants = getSelectedQuants();
-        
+
         try {
             const res = await fetch('/api/requests/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     hf_repo_id: modelId,
                     requested_quants: selectedQuants.length > 0 ? selectedQuants : null
                 })
@@ -1144,7 +1169,7 @@
             clone.querySelector('.request-by').textContent = `by ${req.requested_by}`;
 
             const declineInput = clone.querySelector('.decline-reason-input');
-            
+
             // Display requested quants
             const requestedQuants = req.requested_quants || [];
             const quantsValueEl = clone.querySelector('.requested-quants-value');
@@ -1153,12 +1178,12 @@
             } else {
                 quantsValueEl.innerHTML = '<em style="opacity: 0.7;">All quants (no preference)</em>';
             }
-            
+
             // Set up inline quant selector
             const quantSelector = clone.querySelector('.request-quant-selector');
             const checkboxContainer = clone.querySelector('.request-quant-checkboxes');
             const quantCountEl = clone.querySelector('.request-quant-count');
-            
+
             // Populate checkboxes
             availableQuants.forEach(quant => {
                 const label = document.createElement('label');
@@ -1172,7 +1197,7 @@
                 `;
                 checkboxContainer.appendChild(label);
             });
-            
+
             function updateReqQuantCount() {
                 const checked = card.querySelectorAll('.req-quant-cb:checked');
                 const count = checked.length;
@@ -1184,7 +1209,7 @@
                     quantCountEl.innerHTML = `<span style="color: var(--success);">${count} quants selected</span>`;
                 }
             }
-            
+
             // Bind checkbox change events after appending
             setTimeout(() => {
                 const actualCard = container.querySelector(`.request-card[data-request-id="${req.id}"]`);
@@ -1205,9 +1230,9 @@
                     });
                 }
             }, 0);
-            
+
             // Edit quants button
-            clone.querySelector('.edit-quants-btn').onclick = function() {
+            clone.querySelector('.edit-quants-btn').onclick = function () {
                 const selector = this.closest('.request-card').querySelector('.request-quant-selector');
                 if (selector.style.display === 'none') {
                     selector.style.display = 'block';
@@ -1217,17 +1242,17 @@
                     this.textContent = '✏️ Edit quants before approving';
                 }
             };
-            
+
             // Quick select buttons
-            clone.querySelector('.req-select-all').onclick = function() {
+            clone.querySelector('.req-select-all').onclick = function () {
                 this.closest('.request-card').querySelectorAll('.req-quant-cb').forEach(cb => cb.checked = true);
                 this.closest('.request-card').querySelector('.req-quant-cb').dispatchEvent(new Event('change'));
             };
-            clone.querySelector('.req-select-none').onclick = function() {
+            clone.querySelector('.req-select-none').onclick = function () {
                 this.closest('.request-card').querySelectorAll('.req-quant-cb').forEach(cb => cb.checked = false);
                 this.closest('.request-card').querySelector('.req-quant-cb').dispatchEvent(new Event('change'));
             };
-            clone.querySelector('.req-select-user').onclick = function() {
+            clone.querySelector('.req-select-user').onclick = function () {
                 const cardEl = this.closest('.request-card');
                 cardEl.querySelectorAll('.req-quant-cb').forEach(cb => {
                     cb.checked = requestedQuants.length === 0 || requestedQuants.includes(cb.value);
@@ -1239,19 +1264,23 @@
                 const cardEl = container.querySelector(`.request-card[data-request-id="${req.id}"]`);
                 const checkedBoxes = cardEl.querySelectorAll('.req-quant-cb:checked');
                 const approvedQuants = Array.from(checkedBoxes).map(cb => cb.value);
-                
+                const ignoreSpaceCheck = cardEl.querySelector('.ignore-space-check').checked;
+
                 if (approvedQuants.length === 0) {
                     alert('Please select at least one quant type to generate.');
                     return;
                 }
-                
+
                 // If all quants selected, send null (means all)
                 const quantsToSend = approvedQuants.length === availableQuants.length ? null : approvedQuants;
-                
-                await fetch(`/api/requests/${req.id}/approve`, { 
+
+                await fetch(`/api/requests/${req.id}/approve`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ approved_quants: quantsToSend })
+                    body: JSON.stringify({
+                        approved_quants: quantsToSend,
+                        ignore_space_check: ignoreSpaceCheck
+                    })
                 });
                 fetchRequests();
                 fetchStatus();
@@ -1289,7 +1318,7 @@
             };
 
             container.appendChild(clone);
-            
+
             // Initialize count display
             setTimeout(() => {
                 const actualCard = container.querySelector(`.request-card[data-request-id="${req.id}"]`);
