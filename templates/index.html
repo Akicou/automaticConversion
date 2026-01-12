@@ -299,6 +299,18 @@
 {% block content %}
 <div class="dashboard-container" style="max-width: 800px; margin: 0 auto; padding-top: 2rem;">
 
+    {% if role == 'admin' %}
+    <!-- Admin Controls Bar -->
+    <div id="admin-controls" style="margin-bottom: 1.5rem; display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
+        <div id="update-status" style="font-size: 0.75rem; color: var(--text-secondary);"></div>
+        <button id="update-app-btn" onclick="performAppUpdate()" disabled
+            style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: not-allowed; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; opacity: 0.5;">
+            <span id="update-btn-icon">🔄</span>
+            <span id="update-btn-text">Check for updates...</span>
+        </button>
+    </div>
+    {% endif %}
+
     <!-- Request Section (Visible to all) -->
     <div style="margin-bottom: 3rem;">
         <h2 style="font-weight: 400; font-size: 1.2rem; margin-bottom: 1rem; color: var(--text-secondary);">
@@ -632,6 +644,145 @@
     
     // Load quants on page load
     loadAvailableQuants();
+    
+    // ====== APP UPDATE SYSTEM (Admin only) ======
+    let updateAvailable = false;
+    let updateInfo = null;
+    
+    async function checkForAppUpdate() {
+        if (!isAdmin) return;
+        
+        const btn = document.getElementById('update-app-btn');
+        const statusEl = document.getElementById('update-status');
+        const btnText = document.getElementById('update-btn-text');
+        const btnIcon = document.getElementById('update-btn-icon');
+        
+        if (!btn) return;
+        
+        try {
+            const res = await fetch('/api/admin/check-update');
+            const data = await res.json();
+            
+            if (data.error) {
+                statusEl.textContent = 'Update check failed';
+                btnText.textContent = 'Update unavailable';
+                return;
+            }
+            
+            updateInfo = data;
+            updateAvailable = data.update_available;
+            
+            if (updateAvailable) {
+                btn.disabled = false;
+                btn.style.cursor = 'pointer';
+                btn.style.opacity = '1';
+                btn.style.borderColor = 'var(--success)';
+                btn.style.color = 'var(--success)';
+                btnIcon.textContent = '⬆️';
+                btnText.textContent = `Update Available (${data.commits_behind} commit${data.commits_behind > 1 ? 's' : ''})`;
+                statusEl.innerHTML = `<span style="color: var(--success);">v${data.local_commit} → v${data.remote_commit}</span>`;
+                if (data.latest_message) {
+                    btn.title = `Latest: ${data.latest_message}`;
+                }
+            } else {
+                btn.disabled = true;
+                btn.style.cursor = 'not-allowed';
+                btn.style.opacity = '0.5';
+                btn.style.borderColor = 'var(--glass-border)';
+                btn.style.color = 'var(--text-secondary)';
+                btnIcon.textContent = '✓';
+                btnText.textContent = 'Up to date';
+                statusEl.innerHTML = `<span style="opacity: 0.7;">v${data.local_commit}</span>`;
+            }
+        } catch (e) {
+            console.error('Update check failed:', e);
+            statusEl.textContent = 'Update check failed';
+        }
+    }
+    
+    async function performAppUpdate() {
+        if (!updateAvailable || !isAdmin) return;
+        
+        const btn = document.getElementById('update-app-btn');
+        const btnText = document.getElementById('update-btn-text');
+        const btnIcon = document.getElementById('update-btn-icon');
+        const statusEl = document.getElementById('update-status');
+        
+        if (!confirm(`Update GGUF Forge?\n\nThis will:\n• Pull latest changes (${updateInfo.commits_behind} commits)\n• Restart the server\n\nAny running jobs will be interrupted.`)) {
+            return;
+        }
+        
+        btn.disabled = true;
+        btn.style.cursor = 'wait';
+        btnIcon.textContent = '⏳';
+        btnText.textContent = 'Updating...';
+        statusEl.textContent = 'Pulling latest changes...';
+        
+        try {
+            const res = await fetch('/api/admin/update-app', { method: 'POST' });
+            const data = await res.json();
+            
+            if (data.status === 'success') {
+                btnIcon.textContent = '🔄';
+                btnText.textContent = 'Restarting...';
+                statusEl.innerHTML = '<span style="color: var(--success);">Update complete! Server restarting...</span>';
+                
+                // Poll for server to come back up
+                setTimeout(() => {
+                    statusEl.textContent = 'Waiting for server...';
+                    pollServerRestart();
+                }, 2000);
+            } else {
+                btnIcon.textContent = '❌';
+                btnText.textContent = 'Update failed';
+                statusEl.innerHTML = `<span style="color: var(--error);">${data.message}</span>`;
+                btn.disabled = false;
+                btn.style.cursor = 'pointer';
+            }
+        } catch (e) {
+            // Connection lost likely means server is restarting
+            btnIcon.textContent = '🔄';
+            btnText.textContent = 'Restarting...';
+            statusEl.innerHTML = '<span style="color: var(--success);">Server restarting...</span>';
+            setTimeout(() => pollServerRestart(), 2000);
+        }
+    }
+    
+    async function pollServerRestart() {
+        const statusEl = document.getElementById('update-status');
+        let attempts = 0;
+        const maxAttempts = 30;
+        
+        const poll = async () => {
+            attempts++;
+            try {
+                const res = await fetch('/api/health', { cache: 'no-store' });
+                if (res.ok) {
+                    statusEl.innerHTML = '<span style="color: var(--success);">Server is back! Reloading...</span>';
+                    setTimeout(() => window.location.reload(), 500);
+                    return;
+                }
+            } catch (e) {
+                // Server not ready yet
+            }
+            
+            if (attempts < maxAttempts) {
+                statusEl.textContent = `Waiting for server... (${attempts}/${maxAttempts})`;
+                setTimeout(poll, 1000);
+            } else {
+                statusEl.innerHTML = '<span style="color: var(--error);">Server not responding. Please refresh manually.</span>';
+            }
+        };
+        
+        poll();
+    }
+    
+    // Check for updates on page load (admin only)
+    if (isAdmin) {
+        setTimeout(checkForAppUpdate, 1000);
+        // Re-check every 5 minutes
+        setInterval(checkForAppUpdate, 5 * 60 * 1000);
+    }
 
     // Autocomplete
     if (searchInput) {

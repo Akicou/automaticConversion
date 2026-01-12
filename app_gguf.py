@@ -484,6 +484,141 @@ async def get_db_info(request: Request):
     return info
 
 
+@app.get("/api/admin/check-update")
+async def check_for_update(request: Request):
+    """Admin only: Check if a git update is available."""
+    user = await require_admin(request)
+    
+    try:
+        # Fetch latest from origin (without merging)
+        fetch_proc = await asyncio.create_subprocess_exec(
+            "git", "fetch", "origin",
+            cwd=BASE_DIR,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        await fetch_proc.wait()
+        
+        # Get current branch
+        branch_proc = await asyncio.create_subprocess_exec(
+            "git", "rev-parse", "--abbrev-ref", "HEAD",
+            cwd=BASE_DIR,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await branch_proc.communicate()
+        current_branch = stdout.decode().strip()
+        
+        # Get local commit hash
+        local_proc = await asyncio.create_subprocess_exec(
+            "git", "rev-parse", "HEAD",
+            cwd=BASE_DIR,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await local_proc.communicate()
+        local_commit = stdout.decode().strip()[:7]
+        
+        # Get remote commit hash
+        remote_proc = await asyncio.create_subprocess_exec(
+            "git", "rev-parse", f"origin/{current_branch}",
+            cwd=BASE_DIR,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await remote_proc.communicate()
+        remote_commit = stdout.decode().strip()[:7]
+        
+        # Count commits behind
+        behind_proc = await asyncio.create_subprocess_exec(
+            "git", "rev-list", "--count", f"HEAD..origin/{current_branch}",
+            cwd=BASE_DIR,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await behind_proc.communicate()
+        commits_behind = int(stdout.decode().strip()) if stdout else 0
+        
+        # Get latest commit message from origin
+        msg_proc = await asyncio.create_subprocess_exec(
+            "git", "log", "-1", "--format=%s", f"origin/{current_branch}",
+            cwd=BASE_DIR,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await msg_proc.communicate()
+        latest_message = stdout.decode().strip()[:100]
+        
+        return {
+            "update_available": commits_behind > 0,
+            "commits_behind": commits_behind,
+            "local_commit": local_commit,
+            "remote_commit": remote_commit,
+            "branch": current_branch,
+            "latest_message": latest_message if commits_behind > 0 else None
+        }
+    except Exception as e:
+        logger.exception("Failed to check for updates")
+        return {
+            "update_available": False,
+            "error": str(e)
+        }
+
+
+@app.post("/api/admin/update-app")
+async def update_app(request: Request):
+    """Admin only: Pull latest updates and restart the server."""
+    user = await require_admin(request)
+    
+    try:
+        # Get current branch
+        branch_proc = await asyncio.create_subprocess_exec(
+            "git", "rev-parse", "--abbrev-ref", "HEAD",
+            cwd=BASE_DIR,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await branch_proc.communicate()
+        current_branch = stdout.decode().strip()
+        
+        # Fetch and reset to origin (same as update scripts)
+        fetch_proc = await asyncio.create_subprocess_exec(
+            "git", "fetch", "--all",
+            cwd=BASE_DIR,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        await fetch_proc.wait()
+        
+        reset_proc = await asyncio.create_subprocess_exec(
+            "git", "reset", "--hard", f"origin/{current_branch}",
+            cwd=BASE_DIR,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await reset_proc.communicate()
+        
+        if reset_proc.returncode != 0:
+            return {"status": "error", "message": f"Git reset failed: {stderr.decode()}"}
+        
+        # Schedule server restart after response is sent
+        async def restart_server():
+            await asyncio.sleep(1)  # Give time for response to be sent
+            logger.info("Restarting server after update...")
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        
+        asyncio.create_task(restart_server())
+        
+        return {
+            "status": "success", 
+            "message": "Update complete. Server restarting...",
+            "branch": current_branch
+        }
+    except Exception as e:
+        logger.exception("Failed to update app")
+        return {"status": "error", "message": str(e)}
+
+
 @app.get("/api/quants")
 async def get_available_quants():
     """Get list of available quantization types."""
