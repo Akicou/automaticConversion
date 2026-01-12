@@ -40,6 +40,14 @@ async def search_hf(q: str):
         return []
 
 
+def validate_quants(quants: list) -> list:
+    """Validate quant names against available quants. Returns valid quants only."""
+    available = get_quants_list()
+    if not quants:
+        return []
+    return [q for q in quants if q in available]
+
+
 @router.post("/models/process")
 async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, user = Depends(get_admin)):
     conn = await get_db_connection()
@@ -50,6 +58,16 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
          await conn.close()
          raise HTTPException(status_code=400, detail="Model already processing")
     
+    # Validate and process quants
+    available_quants = get_quants_list()
+    if req.quants:
+        quants_to_run = validate_quants(req.quants)
+        if not quants_to_run:
+            await conn.close()
+            raise HTTPException(status_code=400, detail="No valid quants specified")
+    else:
+        quants_to_run = available_quants
+    
     new_id = str(uuid.uuid4())
     
     # Delete existing record first (if any) for MSSQL compatibility
@@ -57,17 +75,18 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
     if existing:
         await conn.execute("DELETE FROM models WHERE hf_repo_id = ?", (req.model_id,))
     
+    quants_msg = ', '.join(quants_to_run) if len(quants_to_run) < len(available_quants) else 'all quants'
     await conn.execute(
         "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details) VALUES (?, ?, ?, ?, ?, ?)",
-        (new_id, req.model_id, "pending", 0, "Queued...", "")
+        (new_id, req.model_id, "pending", 0, f"Queued... Quants: {quants_msg}", "")
     )
     await conn.commit()
     await conn.close()
     
-    workflow = ModelWorkflow(new_id, req.model_id)
+    workflow = ModelWorkflow(new_id, req.model_id, quants_to_run=quants_to_run)
     background_tasks.add_task(workflow.run_pipeline)
     
-    return {"status": "started", "id": new_id}
+    return {"status": "started", "id": new_id, "quants": quants_to_run}
 
 
 @router.get("/status/all")

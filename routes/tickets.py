@@ -1,13 +1,30 @@
 """
 Ticket/conversation system routes for GGUF Forge.
 """
+import json
 from datetime import datetime
+from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
+from pydantic import BaseModel
 
 from database import get_db_connection
 from models import TicketMessage, CreateTicketRequest
 from websocket_manager import broadcast_tickets_update, broadcast_requests_update, broadcast_my_requests_update
+from workflow import get_quants_list
+
+
+class ApproveTicketBody(BaseModel):
+    """Optional body for ticket approval with quant selection."""
+    approved_quants: Optional[List[str]] = None
+
+
+def validate_quants(quants: list) -> list:
+    """Validate quant names against available quants. Returns valid quants only."""
+    available = get_quants_list()
+    if not quants:
+        return []
+    return [q for q in quants if q in available]
 
 router = APIRouter(prefix="/api/tickets")
 
@@ -221,8 +238,17 @@ async def close_ticket(ticket_id: int, user = Depends(get_admin)):
 
 
 @router.post("/{ticket_id}/approve")
-async def approve_ticket(ticket_id: int, background_tasks: BackgroundTasks, user = Depends(get_admin)):
-    """Admin only: Approve a ticket - starts conversion and closes the ticket."""
+async def approve_ticket(
+    ticket_id: int, 
+    background_tasks: BackgroundTasks, 
+    body: ApproveTicketBody = None,
+    user = Depends(get_admin)
+):
+    """Admin only: Approve a ticket - starts conversion and closes the ticket.
+    
+    Admin can optionally specify quants via body.approved_quants.
+    If not provided, uses the user's requested_quants or all quants if empty.
+    """
     import uuid
     from workflow import ModelWorkflow
     
@@ -241,26 +267,58 @@ async def approve_ticket(ticket_id: int, background_tasks: BackgroundTasks, user
         await conn.close()
         raise HTTPException(status_code=404, detail="Associated request not found")
     
+    # Determine which quants to use
+    available_quants = get_quants_list()
+    
+    # Priority: admin override > user request > all quants
+    if body and body.approved_quants:
+        # Admin explicitly set quants
+        approved_quants = validate_quants(body.approved_quants)
+        if not approved_quants:
+            await conn.close()
+            raise HTTPException(status_code=400, detail="No valid quants specified")
+    else:
+        # Use user's requested quants if available
+        user_quants_json = req.get('requested_quants', '')
+        if user_quants_json:
+            try:
+                user_quants = json.loads(user_quants_json)
+                approved_quants = validate_quants(user_quants)
+            except:
+                approved_quants = []
+        else:
+            approved_quants = []
+        
+        # If no specific quants requested, use all
+        if not approved_quants:
+            approved_quants = available_quants
+    
+    approved_quants_json = json.dumps(approved_quants)
+    
     # Close the ticket
     await conn.execute(
         "UPDATE tickets SET status = 'closed', closed_at = ? WHERE id = ?",
         (datetime.now(), ticket_id)
     )
     
-    # Approve the request
-    await conn.execute("UPDATE requests SET status = 'approved' WHERE id = ?", (ticket['request_id'],))
+    # Approve the request and save approved quants
+    await conn.execute(
+        "UPDATE requests SET status = 'approved', approved_quants = ? WHERE id = ?", 
+        (approved_quants_json, ticket['request_id'])
+    )
     
     # Start the conversion
     hf_repo_id = req['hf_repo_id']
     new_id = str(uuid.uuid4())
+    quants_msg = ', '.join(approved_quants) if len(approved_quants) < len(available_quants) else 'all quants'
     await conn.execute(
         "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details) VALUES (?, ?, ?, ?, ?, ?)",
-        (new_id, hf_repo_id, "pending", 0, "Queued from approved discussion...", "")
+        (new_id, hf_repo_id, "pending", 0, f"Queued from approved discussion... Quants: {quants_msg}", "")
     )
     await conn.commit()
     await conn.close()
     
-    workflow = ModelWorkflow(new_id, hf_repo_id)
+    workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants)
     background_tasks.add_task(workflow.run_pipeline)
     
     # Broadcast updates via WebSocket
@@ -268,7 +326,7 @@ async def approve_ticket(ticket_id: int, background_tasks: BackgroundTasks, user
     await broadcast_requests_update()
     await broadcast_my_requests_update()
     
-    return {"status": "approved", "model_id": new_id}
+    return {"status": "approved", "model_id": new_id, "quants": approved_quants}
 
 
 @router.post("/{ticket_id}/reopen")

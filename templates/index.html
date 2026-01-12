@@ -327,6 +327,29 @@
             </label>
         </div>
         {% endif %}
+        
+        <!-- Quant Selection Panel -->
+        <div style="margin-top: 1rem;">
+            <button type="button" id="quant-toggle" onclick="toggleQuantSelector()" 
+                style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span id="quant-toggle-icon">▶</span>
+                <span>Select Quants <span style="opacity: 0.7;">(optional - defaults to all)</span></span>
+            </button>
+            <div id="quant-selector" style="display: none; margin-top: 0.75rem; padding: 1rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">Select quantization formats:</span>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" onclick="selectAllQuants()" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">All</button>
+                        <button type="button" onclick="selectNoQuants()" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">None</button>
+                        <button type="button" onclick="selectRecommendedQuants()" style="background: transparent; border: 1px solid var(--success); color: var(--success); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">Recommended</button>
+                    </div>
+                </div>
+                <div id="quant-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.5rem;">
+                    <!-- Populated by JavaScript -->
+                </div>
+                <div id="quant-selected-count" style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Admin: Pending Requests -->
@@ -438,6 +461,28 @@
                     style="background: transparent; color: var(--error); border: 1px solid var(--error); padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Reject</button>
             </div>
         </div>
+        <!-- Requested quants display -->
+        <div class="requested-quants-row" style="margin-bottom: 0.75rem;">
+            <div class="requested-quants-label" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                Requested quants: <span class="requested-quants-value" style="color: var(--text-primary);"></span>
+            </div>
+            <button type="button" class="edit-quants-btn" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">
+                ✏️ Edit quants before approving
+            </button>
+        </div>
+        <!-- Inline quant selector for admin -->
+        <div class="request-quant-selector" style="display: none; margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.75rem; color: var(--text-secondary);">Modify quants to generate:</span>
+                <div style="display: flex; gap: 0.4rem;">
+                    <button type="button" class="req-select-all" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">All</button>
+                    <button type="button" class="req-select-none" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">None</button>
+                    <button type="button" class="req-select-user" style="background: transparent; border: 1px solid #60a5fa; color: #60a5fa; padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">User's</button>
+                </div>
+            </div>
+            <div class="request-quant-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 0.3rem;"></div>
+            <div class="request-quant-count" style="margin-top: 0.5rem; font-size: 0.7rem; color: var(--text-secondary);"></div>
+        </div>
         <div class="decline-reason-row" style="display: flex; gap: 0.5rem; align-items: center;">
             <input type="text" class="decline-reason-input" placeholder="Message (for discussion or decline reason)..."
                 style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 0.5rem; border-radius: 4px; color: var(--text-primary); font-size: 0.85rem;">
@@ -492,6 +537,101 @@
     const searchInput = document.getElementById('modelSearch');
     const suggestionsBox = document.getElementById('suggestions');
     const isAdmin = '{{ role }}' === 'admin';
+    
+    // ====== QUANT SELECTOR ======
+    let availableQuants = [];
+    let quantDescriptions = {};
+    const recommendedQuants = ['Q4_K_M', 'Q5_K_M', 'Q6_K', 'Q8_0'];
+    
+    async function loadAvailableQuants() {
+        try {
+            const res = await fetch('/api/quants');
+            const data = await res.json();
+            availableQuants = data.quants || [];
+            quantDescriptions = data.descriptions || {};
+            renderQuantCheckboxes();
+        } catch (e) {
+            console.error('Failed to load quants:', e);
+        }
+    }
+    
+    function renderQuantCheckboxes() {
+        const container = document.getElementById('quant-checkboxes');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        availableQuants.forEach(quant => {
+            const label = document.createElement('label');
+            label.style.cssText = 'display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid transparent; transition: all 0.2s;';
+            label.title = quantDescriptions[quant] || quant;
+            label.innerHTML = `
+                <input type="checkbox" class="quant-checkbox" value="${quant}" onchange="updateQuantCount()" style="accent-color: var(--success); cursor: pointer;">
+                <span style="font-size: 0.8rem; font-family: monospace; color: var(--text-primary);">${quant}</span>
+            `;
+            label.onmouseover = () => label.style.borderColor = 'var(--glass-border)';
+            label.onmouseout = () => label.style.borderColor = 'transparent';
+            container.appendChild(label);
+        });
+        updateQuantCount();
+    }
+    
+    function toggleQuantSelector() {
+        const selector = document.getElementById('quant-selector');
+        const icon = document.getElementById('quant-toggle-icon');
+        if (selector.style.display === 'none') {
+            selector.style.display = 'block';
+            icon.textContent = '▼';
+        } else {
+            selector.style.display = 'none';
+            icon.textContent = '▶';
+        }
+    }
+    
+    function getSelectedQuants() {
+        const checkboxes = document.querySelectorAll('.quant-checkbox:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
+    }
+    
+    function selectAllQuants() {
+        document.querySelectorAll('.quant-checkbox').forEach(cb => cb.checked = true);
+        updateQuantCount();
+    }
+    
+    function selectNoQuants() {
+        document.querySelectorAll('.quant-checkbox').forEach(cb => cb.checked = false);
+        updateQuantCount();
+    }
+    
+    function selectRecommendedQuants() {
+        document.querySelectorAll('.quant-checkbox').forEach(cb => {
+            cb.checked = recommendedQuants.includes(cb.value);
+        });
+        updateQuantCount();
+    }
+    
+    function setSelectedQuants(quants) {
+        document.querySelectorAll('.quant-checkbox').forEach(cb => {
+            cb.checked = quants.includes(cb.value);
+        });
+        updateQuantCount();
+    }
+    
+    function updateQuantCount() {
+        const selected = getSelectedQuants();
+        const countEl = document.getElementById('quant-selected-count');
+        if (countEl) {
+            if (selected.length === 0) {
+                countEl.innerHTML = '<span style="color: var(--text-secondary);">No quants selected — <strong>all quants</strong> will be generated</span>';
+            } else if (selected.length === availableQuants.length) {
+                countEl.innerHTML = '<span style="color: var(--success);">All ' + selected.length + ' quants selected</span>';
+            } else {
+                countEl.innerHTML = '<span style="color: var(--success);">' + selected.length + ' of ' + availableQuants.length + ' quants selected: ' + selected.join(', ') + '</span>';
+            }
+        }
+    }
+    
+    // Load quants on page load
+    loadAvailableQuants();
 
     // Autocomplete
     if (searchInput) {
@@ -541,14 +681,25 @@
         const modelId = searchInput.value;
         if (!modelId) return;
 
+        // Collect selected quants (empty array means "all quants")
+        const selectedQuants = getSelectedQuants();
+        
         try {
             const res = await fetch('/api/models/process', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model_id: modelId })
+                body: JSON.stringify({ 
+                    model_id: modelId,
+                    quants: selectedQuants.length > 0 ? selectedQuants : null
+                })
             });
             if (res.ok) {
+                const data = await res.json();
                 searchInput.value = '';
+                // Reset quant selector
+                selectNoQuants();
+                document.getElementById('quant-selector').style.display = 'none';
+                document.getElementById('quant-toggle-icon').textContent = '▶';
                 fetchStatus();
             } else {
                 const err = await res.json();
@@ -563,15 +714,25 @@
         const modelId = searchInput.value;
         if (!modelId) return;
 
+        // Collect selected quants (empty array means "all quants")
+        const selectedQuants = getSelectedQuants();
+        
         try {
             const res = await fetch('/api/requests/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ hf_repo_id: modelId })
+                body: JSON.stringify({ 
+                    hf_repo_id: modelId,
+                    requested_quants: selectedQuants.length > 0 ? selectedQuants : null
+                })
             });
             const data = await res.json();
             alert(data.message);
             searchInput.value = '';
+            // Reset quant selector
+            selectNoQuants();
+            document.getElementById('quant-selector').style.display = 'none';
+            document.getElementById('quant-toggle-icon').textContent = '▶';
         } catch (e) {
             alert('Failed to submit request');
         }
@@ -826,14 +987,121 @@
         requests.forEach(req => {
             const clone = template.content.cloneNode(true);
             const card = clone.querySelector('.request-card');
+            card.dataset.requestId = req.id;
 
             clone.querySelector('.request-model').textContent = req.hf_repo_id;
             clone.querySelector('.request-by').textContent = `by ${req.requested_by}`;
 
             const declineInput = clone.querySelector('.decline-reason-input');
+            
+            // Display requested quants
+            const requestedQuants = req.requested_quants || [];
+            const quantsValueEl = clone.querySelector('.requested-quants-value');
+            if (requestedQuants.length > 0) {
+                quantsValueEl.textContent = requestedQuants.join(', ');
+            } else {
+                quantsValueEl.innerHTML = '<em style="opacity: 0.7;">All quants (no preference)</em>';
+            }
+            
+            // Set up inline quant selector
+            const quantSelector = clone.querySelector('.request-quant-selector');
+            const checkboxContainer = clone.querySelector('.request-quant-checkboxes');
+            const quantCountEl = clone.querySelector('.request-quant-count');
+            
+            // Populate checkboxes
+            availableQuants.forEach(quant => {
+                const label = document.createElement('label');
+                label.style.cssText = 'display: flex; align-items: center; gap: 0.3rem; cursor: pointer; padding: 0.25rem 0.4rem; background: rgba(255,255,255,0.03); border-radius: 3px; font-size: 0.7rem;';
+                label.title = quantDescriptions[quant] || quant;
+                const isRequested = requestedQuants.includes(quant);
+                const isChecked = requestedQuants.length === 0 || isRequested;
+                label.innerHTML = `
+                    <input type="checkbox" class="req-quant-cb" value="${quant}" ${isChecked ? 'checked' : ''} style="accent-color: var(--success); cursor: pointer; width: 12px; height: 12px;">
+                    <span style="font-family: monospace; color: ${isRequested ? '#60a5fa' : 'var(--text-primary)'};">${quant}</span>
+                `;
+                checkboxContainer.appendChild(label);
+            });
+            
+            function updateReqQuantCount() {
+                const checked = card.querySelectorAll('.req-quant-cb:checked');
+                const count = checked.length;
+                if (count === 0) {
+                    quantCountEl.innerHTML = '<span style="color: var(--error);">⚠ No quants selected</span>';
+                } else if (count === availableQuants.length) {
+                    quantCountEl.innerHTML = `<span style="color: var(--success);">All ${count} quants</span>`;
+                } else {
+                    quantCountEl.innerHTML = `<span style="color: var(--success);">${count} quants selected</span>`;
+                }
+            }
+            
+            // Bind checkbox change events after appending
+            setTimeout(() => {
+                const actualCard = container.querySelector(`.request-card[data-request-id="${req.id}"]`);
+                if (actualCard) {
+                    actualCard.querySelectorAll('.req-quant-cb').forEach(cb => {
+                        cb.addEventListener('change', () => {
+                            const countEl = actualCard.querySelector('.request-quant-count');
+                            const checked = actualCard.querySelectorAll('.req-quant-cb:checked');
+                            const count = checked.length;
+                            if (count === 0) {
+                                countEl.innerHTML = '<span style="color: var(--error);">⚠ No quants selected</span>';
+                            } else if (count === availableQuants.length) {
+                                countEl.innerHTML = `<span style="color: var(--success);">All ${count} quants</span>`;
+                            } else {
+                                countEl.innerHTML = `<span style="color: var(--success);">${count} quants selected</span>`;
+                            }
+                        });
+                    });
+                }
+            }, 0);
+            
+            // Edit quants button
+            clone.querySelector('.edit-quants-btn').onclick = function() {
+                const selector = this.closest('.request-card').querySelector('.request-quant-selector');
+                if (selector.style.display === 'none') {
+                    selector.style.display = 'block';
+                    this.textContent = '✕ Close quant editor';
+                } else {
+                    selector.style.display = 'none';
+                    this.textContent = '✏️ Edit quants before approving';
+                }
+            };
+            
+            // Quick select buttons
+            clone.querySelector('.req-select-all').onclick = function() {
+                this.closest('.request-card').querySelectorAll('.req-quant-cb').forEach(cb => cb.checked = true);
+                this.closest('.request-card').querySelector('.req-quant-cb').dispatchEvent(new Event('change'));
+            };
+            clone.querySelector('.req-select-none').onclick = function() {
+                this.closest('.request-card').querySelectorAll('.req-quant-cb').forEach(cb => cb.checked = false);
+                this.closest('.request-card').querySelector('.req-quant-cb').dispatchEvent(new Event('change'));
+            };
+            clone.querySelector('.req-select-user').onclick = function() {
+                const cardEl = this.closest('.request-card');
+                cardEl.querySelectorAll('.req-quant-cb').forEach(cb => {
+                    cb.checked = requestedQuants.length === 0 || requestedQuants.includes(cb.value);
+                });
+                cardEl.querySelector('.req-quant-cb').dispatchEvent(new Event('change'));
+            };
 
             clone.querySelector('.approve-btn').onclick = async () => {
-                await fetch(`/api/requests/${req.id}/approve`, { method: 'POST' });
+                const cardEl = container.querySelector(`.request-card[data-request-id="${req.id}"]`);
+                const checkedBoxes = cardEl.querySelectorAll('.req-quant-cb:checked');
+                const approvedQuants = Array.from(checkedBoxes).map(cb => cb.value);
+                
+                if (approvedQuants.length === 0) {
+                    alert('Please select at least one quant type to generate.');
+                    return;
+                }
+                
+                // If all quants selected, send null (means all)
+                const quantsToSend = approvedQuants.length === availableQuants.length ? null : approvedQuants;
+                
+                await fetch(`/api/requests/${req.id}/approve`, { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ approved_quants: quantsToSend })
+                });
                 fetchRequests();
                 fetchStatus();
             };
@@ -870,6 +1138,15 @@
             };
 
             container.appendChild(clone);
+            
+            // Initialize count display
+            setTimeout(() => {
+                const actualCard = container.querySelector(`.request-card[data-request-id="${req.id}"]`);
+                if (actualCard) {
+                    const firstCb = actualCard.querySelector('.req-quant-cb');
+                    if (firstCb) firstCb.dispatchEvent(new Event('change'));
+                }
+            }, 10);
         });
     }
 
