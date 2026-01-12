@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+ENV
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Build artifacts
+*.egg-info
+dist
+build
+
+# Local development
+.cache
+llama.cpp
+*.db
+creds.txt
+.env.local
+
+# Docker
+Dockerfile*
+docker-compose*
+.docker
+
+# Documentation
+*.md
+!README.md
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

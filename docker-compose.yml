@@ -1,0 +1,77 @@
+# GGUF Forge Docker Compose Configuration
+# 
+# Usage:
+#   docker-compose up -d          # Start in background
+#   docker-compose logs -f        # View logs
+#   docker-compose down           # Stop
+#
+# First run will generate admin credentials in ./data/creds.txt
+
+services:
+  gguf-forge:
+    build: .
+    container_name: gguf-forge
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent data (database, credentials)
+      - ./data:/data
+      # Model cache (can be large, consider separate volume)
+      - ./cache:/app/.cache
+      # llama.cpp build (persisted to avoid rebuilding)
+      - ./llama.cpp:/app/llama.cpp
+    environment:
+      # HuggingFace token (required for uploading)
+      - HF_TOKEN=${HF_TOKEN:-}
+      
+      # OAuth (optional - for HuggingFace login)
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-}
+      - OAUTH_REDIRECT_URI=${OAUTH_REDIRECT_URI:-http://localhost:8000/auth/callback}
+      
+      # Database (SQLite by default, or MSSQL)
+      # For MSSQL, uncomment and configure:
+      # - MSSQL_HOST=your-server.database.windows.net
+      # - MSSQL_PORT=1433
+      # - MSSQL_DATABASE=gguf_forge
+      # - MSSQL_USER=your_user
+      # - MSSQL_PASSWORD=your_password
+      
+      # Performance tuning
+      - PARALLEL_QUANT_JOBS=2
+      
+      # HuggingFace transfer optimization
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+    
+    # Resource limits (adjust based on your hardware)
+    # Quantization is CPU-intensive
+    deploy:
+      resources:
+        limits:
+          memory: 32G
+        reservations:
+          memory: 8G
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# Optional: NVIDIA GPU support
+# Uncomment below and use: docker-compose --profile gpu up -d
+#
+#   gguf-forge-gpu:
+#     extends:
+#       service: gguf-forge
+#     profiles:
+#       - gpu
+#     deploy:
+#       resources:
+#         reservations:
+#           devices:
+#             - driver: nvidia
+#               count: all
+#               capabilities: [gpu]

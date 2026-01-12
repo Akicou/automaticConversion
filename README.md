@@ -61,6 +61,99 @@ A modern, glassmorphic FastAPI application to automate the conversion of Hugging
 
 4.  Create a `.env` file with the required secrets (see Configuration below)
 
+## Docker Installation
+
+For containerized deployment, use the included Docker configuration.
+
+### Quick Start
+
+```bash
+# 1. Create .env file with your tokens
+cat > .env << EOF
+HF_TOKEN=hf_your_token_here
+OAUTH_CLIENT_ID=your_client_id
+OAUTH_CLIENT_SECRET=your_client_secret
+OAUTH_REDIRECT_URI=http://localhost:8000/auth/callback
+ADMIN_USERS=your_hf_username
+EOF
+
+# 2. Build and run
+docker-compose up -d
+
+# 3. View logs
+docker-compose logs -f
+
+# 4. Check admin credentials (first run)
+cat data/creds.txt
+```
+
+### Docker Image Contents
+
+The Dockerfile includes:
+- **Python 3.12** (slim-bookworm base)
+- **Git** - for llama.cpp cloning and app updates
+- **Vim** - for editing config files in container
+- **Build tools** - cmake, g++, make (for compiling llama.cpp)
+- **Microsoft ODBC Driver 18** - for SQL Server support
+
+### Volume Mounts
+
+| Mount | Purpose |
+|-------|---------|
+| `./data` | Database + credentials (persistent) |
+| `./cache` | Downloaded models (can be very large!) |
+| `./llama.cpp` | Compiled llama.cpp (avoids rebuilding) |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `HF_TOKEN` | HuggingFace token for uploads (required) |
+| `OAUTH_CLIENT_ID` | HF OAuth app ID (optional) |
+| `OAUTH_CLIENT_SECRET` | HF OAuth secret (optional) |
+| `OAUTH_REDIRECT_URI` | OAuth callback URL |
+| `ADMIN_USERS` | Comma-separated HF usernames for admin access |
+| `PARALLEL_QUANT_JOBS` | Number of parallel quantization jobs (default: 2) |
+| `MSSQL_*` | SQL Server connection settings (optional) |
+
+### GPU Support (NVIDIA)
+
+For GPU-accelerated quantization, uncomment the GPU profile in `docker-compose.yml`:
+
+```bash
+# Run with GPU support
+docker-compose --profile gpu up -d
+```
+
+Requires NVIDIA Container Toolkit installed on the host.
+
+### Resource Requirements
+
+| Resource | Minimum | Recommended |
+|----------|---------|-------------|
+| RAM | 8 GB | 32 GB |
+| Storage | 50 GB | 200+ GB |
+| CPU Cores | 4 | 16+ |
+
+> **Note**: Storage requirements depend on model size. A 7B model needs ~30GB during conversion.
+
+### Manual Docker Build
+
+```bash
+# Build the image
+docker build -t gguf-forge .
+
+# Run with environment file
+docker run -d \
+  --name gguf-forge \
+  -p 8000:8000 \
+  -v ./data:/data \
+  -v ./cache:/app/.cache \
+  -v ./llama.cpp:/app/llama.cpp \
+  --env-file .env \
+  gguf-forge
+```
+
 ## Configuration
 
 Create a `.env` file in the project root with the following variables:
@@ -382,6 +475,25 @@ Each conversion tracks:
 
 ## Admin Features
 
+### App Updates
+Admins can update the application directly from the dashboard:
+1. An **Update App** button appears in the top-right corner
+2. The button automatically checks for available updates
+3. When an update is available, the button shows the commit count
+4. Click to pull the latest changes and restart the server
+
+**Manual Update Scripts:**
+```bash
+# Windows PowerShell
+.\update.ps1
+
+# Linux/macOS
+chmod +x update.sh  # First time only
+./update.sh
+```
+
+> **Note**: Updates will interrupt any running conversion jobs.
+
 ### Job Termination
 Admins can terminate any running conversion job:
 1. Find the job in the "Conversion Queue" section
@@ -431,16 +543,19 @@ If the server crashes during a conversion:
 ### Admin Endpoints
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/models/process` | POST | Start a conversion directly |
+| `/api/models/process` | POST | Start a conversion directly (with optional quants) |
 | `/api/models/{id}/terminate` | POST | Terminate a running job |
+| `/api/models/{id}/continue` | POST | Resume an interrupted job |
 | `/api/requests/all` | GET | View all requests |
 | `/api/requests/{id}/approve` | POST | Approve a request (with optional quant override) |
 | `/api/requests/{id}/reject` | POST | Reject a request |
 | `/api/tickets/create` | POST | Create a discussion ticket |
 | `/api/tickets/all` | GET | View all tickets |
-| `/api/tickets/{id}/approve` | POST | Approve from ticket |
+| `/api/tickets/{id}/approve` | POST | Approve from ticket (with optional quants) |
 | `/api/tickets/{id}/close` | POST | Close/reject a ticket |
 | `/api/admin/db-info` | GET | Database information |
+| `/api/admin/check-update` | GET | Check for available app updates |
+| `/api/admin/update-app` | POST | Pull updates and restart server |
 
 ## Project Structure
 
@@ -452,6 +567,7 @@ automaticConversion/
 ├── models.py            # Pydantic request/response models
 ├── managers.py          # LlamaCpp and HuggingFace managers
 ├── workflow.py          # Model conversion pipeline
+├── websocket_manager.py # Real-time WebSocket updates
 ├── routes/
 │   ├── auth.py          # Authentication (admin login + OAuth)
 │   ├── models.py        # Model processing endpoints
@@ -465,6 +581,10 @@ automaticConversion/
 │   ├── base.html        # Base template
 │   ├── index.html       # Main dashboard
 │   └── login.html       # Admin login page
+├── Dockerfile           # Docker image definition
+├── docker-compose.yml   # Docker Compose configuration
+├── update.ps1           # Update script (Windows PowerShell)
+├── update.sh            # Update script (Linux/macOS)
 ├── .env.example         # Environment template
 └── requirements.txt     # Python dependencies
 ```
