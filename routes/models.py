@@ -70,20 +70,27 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
     
     new_id = str(uuid.uuid4())
     
+    # Get ignore_space_check flag from request (admin only)
+    ignore_space_check = req.ignore_space_check if req.ignore_space_check else False
+    
     # Delete existing record first (if any) for MSSQL compatibility
     # This replaces "INSERT OR REPLACE" which is SQLite-specific
     if existing:
         await conn.execute("DELETE FROM models WHERE hf_repo_id = ?", (req.model_id,))
     
     quants_msg = ', '.join(quants_to_run) if len(quants_to_run) < len(available_quants) else 'all quants'
+    log_msg = f"Queued... Quants: {quants_msg}"
+    if ignore_space_check:
+        log_msg += "\n⚠ Admin override: Space check disabled"
+    
     await conn.execute(
-        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details) VALUES (?, ?, ?, ?, ?, ?)",
-        (new_id, req.model_id, "pending", 0, f"Queued... Quants: {quants_msg}", "")
+        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, ignore_space_check) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (new_id, req.model_id, "pending", 0, log_msg, "", 1 if ignore_space_check else 0)
     )
     await conn.commit()
     await conn.close()
     
-    workflow = ModelWorkflow(new_id, req.model_id, quants_to_run=quants_to_run)
+    workflow = ModelWorkflow(new_id, req.model_id, quants_to_run=quants_to_run, ignore_space_check=ignore_space_check)
     background_tasks.add_task(workflow.run_pipeline)
     
     return {"status": "started", "id": new_id, "quants": quants_to_run}
