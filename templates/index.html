@@ -860,18 +860,13 @@
         // Collect selected quants (empty array means "all quants")
         const selectedQuants = getSelectedQuants();
 
-        // Read "Validate disk space" checkbox - if UNCHECKED, ignore space check
-        const validationCheckbox = document.getElementById('validationCheck');
-        const ignoreSpaceCheck = validationCheckbox ? !validationCheckbox.checked : false;
-
         try {
             const res = await fetch('/api/models/process', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     model_id: modelId,
-                    quants: selectedQuants.length > 0 ? selectedQuants : null,
-                    ignore_space_check: ignoreSpaceCheck
+                    quants: selectedQuants.length > 0 ? selectedQuants : null
                 })
             });
             if (res.ok) {
