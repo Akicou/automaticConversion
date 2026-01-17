@@ -102,6 +102,10 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 QUANTS = ["Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L", "Q4_0", "Q4_K_S", "Q4_K_M", "Q5_0", "Q5_K_S", "Q5_K_M", "Q6_K", "Q8_0"]
 PARALLEL_QUANT_JOBS = int(os.getenv("PARALLEL_QUANT_JOBS", "2"))
 
+# Server configuration
+SERVER_HOST = os.getenv("HOST", "0.0.0.0")
+SERVER_PORT = int(os.getenv("PORT", "8000"))
+
 # Security
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 cookie_sec = APIKeyCookie(name="session_token", auto_error=False)
@@ -694,5 +698,5 @@ async def dashboard_init(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    print("Starting GGUF Forge...")
-    uvicorn.run("app_gguf:app", host="0.0.0.0", port=8000, reload=False)
+    print(f"Starting GGUF Forge on {SERVER_HOST}:{SERVER_PORT}...")
+    uvicorn.run("app_gguf:app", host=SERVER_HOST, port=SERVER_PORT, reload=False)

@@ -38,8 +38,8 @@ services:
       # - MSSQL_USER=your_user
       # - MSSQL_PASSWORD=your_password
       
-      # Performance tuning
-      - PARALLEL_QUANT_JOBS=2
+      # Parallel quantization (number of simultaneous quant jobs)
+      - PARALLEL_QUANT_JOBS=${PARALLEL_QUANT_JOBS:-2}
       
       # HuggingFace transfer optimization
       - HF_HUB_ENABLE_HF_TRANSFER=1
