@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GGUF Forge{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Navigation -->
+        <nav class="glass-nav">
+            <div class="nav-content">
+                <a href="/" class="nav-logo">
+                    <span class="logo-icon">⚒️</span>
+                    <span class="logo-text">GGUF Forge</span>
+                </a>
+
+                <div class="nav-links">
+                    <a href="/" class="nav-item {{ 'active' if request.url.path == '/' else '' }}">Dashboard</a>
+                    {% if user %}
+                    <a href="/api/tickets/my"
+                        class="nav-item {{ 'active' if '/tickets' in request.url.path else '' }}">My Requests</a>
+                    <div class="user-menu">
+                        <span class="user-name">{{ user.username if user.username else user.name }}</span>
+                        <a href="/logout" class="nav-btn logout-btn">Logout</a>
+                    </div>
+                    {% else %}
+                    <a href="/login" class="nav-btn login-btn">Login with HF</a>
+                    {% endif %}
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="glass-footer">
+            <div class="footer-content">
+                <p>GGUF Forge &copy; 2025</p>
+                <div class="footer-links">
+                    <a href="https://github.com/Akicuo/automaticConversion" target="_blank">GitHub</a>
+                    <a href="https://huggingface.co" target="_blank">HuggingFace</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>
