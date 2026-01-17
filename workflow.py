@@ -46,7 +46,7 @@ def get_quants_list():
 class ModelWorkflow:
     def __init__(self, model_id: str, hf_repo_id: str, resume_mode: bool = False, 
                  completed_quants: Optional[List[str]] = None, quants_to_run: Optional[List[str]] = None,
-                 ignore_space_check: bool = False):
+                 ignore_space_check: bool = False, requested_by: Optional[str] = None):
         self.model_id = model_id
         self.hf_repo_id = hf_repo_id
         self.log_buffer = []
@@ -73,6 +73,8 @@ class ModelWorkflow:
         self.api = None
         # Admin override - skip conservative disk space checks
         self.ignore_space_check = ignore_space_check
+        # Track who requested this conversion
+        self.requested_by = requested_by
     
     async def terminate(self):
         """Request termination of this workflow."""
@@ -641,6 +643,11 @@ class ModelWorkflow:
                 
                 timing_section = "\n".join(timing_details)
                 
+                # Build requestor credit line
+                requestor_credit = ""
+                if self.requested_by:
+                    requestor_credit = f"| Requested By | [@{self.requested_by}](https://huggingface.co/{self.requested_by}) |"
+                
                 readme_content = f"""---
 tags:
 - gguf
@@ -665,6 +672,7 @@ The following quants are available:
 | GGUF Forge Version | {app_version} |
 | Total Time | {total_time_str} |
 | Avg Time per Quant | {avg_quant_str} |
+{requestor_credit}
 
 ### Step Breakdown
 {timing_section}

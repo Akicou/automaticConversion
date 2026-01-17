@@ -5,283 +5,175 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}GGUF Forge{% endblock %}</title>
+    <meta name="description"
+        content="Convert AI models to GGUF format for llama.cpp. Fast, free, and easy quantization service.">
     <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-color: #050505;
-            --card-bg: rgba(20, 20, 20, 0.4);
-            --text-primary: #ededed;
-            --text-secondary: #888;
-            --accent: #fff;
-            --accent-hover: #ccc;
-            --error: #ff4444;
-            --success: #00cc66;
-            --glass-border: rgba(255, 255, 255, 0.08);
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-        }
-
-        html {
-            overflow-x: hidden;
-        }
-
-        *,
-        *::before,
-        *::after {
-            box-sizing: border-box;
-        }
-
-        .glass-panel {
-            background: var(--card-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 8px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        header {
-            padding: 1.5rem 0;
-            border-bottom: 1px solid var(--glass-border);
-            background: rgba(5, 5, 5, 0.8);
-            backdrop-filter: blur(8px);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        header .container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 0;
-            padding-bottom: 0;
-        }
-
-        h1 {
-            font-size: 1.2rem;
-            font-weight: 500;
-            margin: 0;
-            color: var(--text-primary);
-            letter-spacing: -0.02em;
-        }
-
-        button.primary {
-            background-color: var(--text-primary);
-            color: var(--bg-color);
-            border: none;
-            padding: 0.6rem 1.2rem;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-
-        button.primary:hover {
-            opacity: 0.9;
-            transform: none;
-        }
-
-        input[type="text"],
-        input[type="password"] {
-            background: rgba(15, 23, 42, 0.5);
-            border: 1px solid var(--glass-border);
-            color: var(--text-primary);
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            width: 100%;
-            box-sizing: border-box;
-            transition: border-color 0.2s;
-        }
-
-        input[type="text"]:focus,
-        input[type="password"]:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
-        .status-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .status-pending {
-            background: rgba(148, 163, 184, 0.2);
-            color: #cbd5e1;
-        }
-
-        .status-processing {
-            background: rgba(59, 130, 246, 0.2);
-            color: #60a5fa;
-        }
-
-        .status-success {
-            background: rgba(16, 185, 129, 0.2);
-            color: #34d399;
-        }
-
-        .status-error {
-            background: rgba(239, 68, 68, 0.2);
-            color: #f87171;
-        }
-
-        /* Transfer progress animations */
-        @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.6;
-            }
-        }
-
-        @keyframes shimmer {
-            0% {
-                background-position: -200% 0;
-            }
-
-            100% {
-                background-position: 200% 0;
-            }
-        }
-
-        .transfer-progress .transfer-files::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        .transfer-progress .transfer-files::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 2px;
-        }
-
-        .transfer-progress .transfer-files::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 2px;
-        }
-
-        .transfer-progress .transfer-files::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        /* ===== MOBILE RESPONSIVE STYLES ===== */
-        @media (max-width: 768px) {
-            .container {
-                padding: 1rem;
-            }
-
-            header {
-                padding: 1rem 0;
-            }
-
-            header .container {
-                flex-wrap: wrap;
-                gap: 0.5rem;
-            }
-
-            h1 {
-                font-size: 1rem;
-            }
-
-            header nav {
-                flex-wrap: wrap;
-                gap: 0.5rem !important;
-                font-size: 0.85rem !important;
-            }
-
-            header nav img {
-                width: 24px !important;
-                height: 24px !important;
-            }
-
-            button.primary {
-                padding: 0.5rem 1rem;
-                font-size: 0.85rem;
-            }
-
-            .status-badge {
-                font-size: 0.7rem;
-                padding: 0.2rem 0.5rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .container {
-                padding: 0.75rem;
-            }
-
-            h1 {
-                font-size: 0.95rem;
-            }
-
-            header nav {
-                font-size: 0.8rem !important;
-            }
-
-            button.primary {
-                padding: 0.45rem 0.9rem;
-                font-size: 0.8rem;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/style.css">
     {% block head %}{% endblock %}
 </head>
 
 <body>
-    <header>
-        <div class="container">
-            <h1>GGUF Forge</h1>
-            <nav style="display: flex; align-items: center; gap: 0.75rem;">
-                {% if user %}
-                {% if oauth_avatar %}
-                <img src="{{ oauth_avatar }}" alt="avatar"
-                    style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">
-                {% endif %}
-                <span style="color: var(--text-secondary); font-size: 0.9rem;">{{ user }}</span>
-                {% if is_oauth %}
-                <a href="/auth/logout"
-                    style="color: var(--text-primary); text-decoration: none; font-size: 0.9rem; opacity: 0.8;">Logout</a>
-                {% else %}
-                <a href="/logout"
-                    style="color: var(--text-primary); text-decoration: none; font-size: 0.9rem; opacity: 0.8;">Logout</a>
-                {% endif %}
-                {% else %}
-                <a href="/login" style="color: var(--text-primary); text-decoration: none; font-size: 0.9rem;">Login</a>
-                {% endif %}
-            </nav>
-        </div>
-    </header>
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="/" class="sidebar-logo">
+                    <img src="/static/favicon.png" alt="GGUF Forge">
+                    <h1>GGUF Forge</h1>
+                </a>
+            </div>
 
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Main</div>
+                    <a href="#" class="nav-item active" data-section="dashboard" onclick="showSection('dashboard')">
+                        <span class="nav-item-icon">🏠</span>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="#" class="nav-item" data-section="convert" onclick="showSection('convert')">
+                        <span class="nav-item-icon">⚡</span>
+                        <span>{% if role == 'admin' %}New Conversion{% else %}Request Conversion{% endif %}</span>
+                    </a>
+                </div>
+
+                {% if role == 'admin' %}
+                <div class="nav-section">
+                    <div class="nav-section-title">Admin</div>
+                    <a href="#" class="nav-item" data-section="requests" onclick="showSection('requests')">
+                        <span class="nav-item-icon">📋</span>
+                        <span>Pending Requests</span>
+                        <span class="nav-item-badge" id="pending-count" style="display: none;">0</span>
+                    </a>
+                    <a href="#" class="nav-item" data-section="tickets" onclick="showSection('tickets')">
+                        <span class="nav-item-icon">💬</span>
+                        <span>Discussions</span>
+                        <span class="nav-item-badge" id="tickets-count" style="display: none;">0</span>
+                    </a>
+                </div>
+                {% endif %}
+
+                {% if user and role != 'admin' %}
+                <div class="nav-section">
+                    <div class="nav-section-title">My Activity</div>
+                    <a href="#" class="nav-item" data-section="my-requests" onclick="showSection('my-requests')">
+                        <span class="nav-item-icon">📝</span>
+                        <span>My Requests</span>
+                    </a>
+                </div>
+                {% endif %}
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Queue</div>
+                    <a href="#" class="nav-item" data-section="queue" onclick="showSection('queue')">
+                        <span class="nav-item-icon">🔄</span>
+                        <span>Conversion Queue</span>
+                        <span class="nav-item-badge" id="queue-count" style="display: none;">0</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                {% if user %}
+                <div class="user-profile">
+                    {% if oauth_avatar %}
+                    <img src="{{ oauth_avatar }}" alt="Avatar" class="user-avatar">
+                    {% else %}
+                    <div class="user-avatar"
+                        style="background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-weight: 600;">
+                        {{ user[0]|upper }}
+                    </div>
+                    {% endif %}
+                    <div class="user-info">
+                        <div class="user-name">{{ user }}</div>
+                        <div class="user-role">{% if role == 'admin' %}Administrator{% else %}User{% endif %}</div>
+                    </div>
+                    {% if is_oauth %}
+                    <a href="/auth/logout" class="btn btn--ghost" title="Logout">🚪</a>
+                    {% else %}
+                    <a href="/logout" class="btn btn--ghost" title="Logout">🚪</a>
+                    {% endif %}
+                </div>
+                {% else %}
+                <a href="/login" class="btn btn--primary" style="width: 100%;">
+                    <span>🔐</span> Login with HuggingFace
+                </a>
+                {% endif %}
+            </div>
+        </aside>
+
+        <!-- Header -->
+        <header class="header">
+            <button class="btn btn--ghost mobile-menu-btn" onclick="toggleSidebar()" style="display: none;">
+                ☰
+            </button>
+            <h2 class="header-title" id="page-title">Dashboard</h2>
+            <div class="header-actions">
+                {% if role == 'admin' %}
+                <div id="update-status" style="font-size: 0.75rem; color: var(--text-muted);"></div>
+                <button id="update-app-btn" onclick="performAppUpdate()" disabled class="btn btn--secondary"
+                    style="opacity: 0.5;">
+                    <span id="update-btn-icon">🔄</span>
+                    <span id="update-btn-text">Check for updates...</span>
+                </button>
+                {% endif %}
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
 
     <script>
-        // Common JS utilities
+        // Sidebar toggle for mobile
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        // Section navigation
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+            // Show target section
+            const target = document.getElementById('section-' + sectionId);
+            if (target) target.classList.remove('hidden');
+
+            // Update nav active state
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.querySelector(`.nav-item[data-section="${sectionId}"]`)?.classList.add('active');
+
+            // Update page title
+            const titles = {
+                'dashboard': 'Dashboard',
+                'convert': '{% if role == "admin" %}New Conversion{% else %}Request Conversion{% endif %}',
+                'requests': 'Pending Requests',
+                'tickets': 'Discussions',
+                'my-requests': 'My Requests',
+                'queue': 'Conversion Queue'
+            };
+            document.getElementById('page-title').textContent = titles[sectionId] || 'Dashboard';
+
+            // Close sidebar on mobile
+            if (window.innerWidth <= 1024) {
+                document.getElementById('sidebar').classList.remove('open');
+            }
+        }
+
+        // Check for mobile on load
+        function checkMobile() {
+            const menuBtn = document.querySelector('.mobile-menu-btn');
+            if (window.innerWidth <= 1024) {
+                menuBtn.style.display = 'block';
+            } else {
+                menuBtn.style.display = 'none';
+            }
+        }
+        window.addEventListener('resize', checkMobile);
+        checkMobile();
     </script>
     {% block scripts %}{% endblock %}
 </body>

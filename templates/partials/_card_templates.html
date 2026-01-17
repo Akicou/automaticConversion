@@ -1,0 +1,171 @@
+<!-- Model Card Template -->
+<template id="model-card-template">
+    <div class="model-card" data-model-id="">
+        <div class="model-card-header">
+            <div>
+                <h3 class="model-name">Model Name</h3>
+                <div class="model-meta">
+                    <span class="model-requestor"></span>
+                </div>
+            </div>
+            <div class="model-card-actions">
+                <span class="status-badge status-badge--pending">Status</span>
+                <button class="btn btn--success continue-btn" style="display: none;">Continue</button>
+                <button class="btn btn--secondary terminate-btn"
+                    style="display: none; border-color: #ff8c00; color: #ff8c00;">Terminate</button>
+                <button class="btn btn--danger delete-btn" style="display: none;">Delete</button>
+            </div>
+        </div>
+
+        <!-- Progress Steps -->
+        <div class="progress-steps">
+            <div class="progress-step progress-step--pending" data-step="download">
+                <span class="progress-step-icon">📥</span>
+                <span>Download</span>
+            </div>
+            <div class="progress-step-connector"></div>
+            <div class="progress-step progress-step--pending" data-step="convert">
+                <span class="progress-step-icon">⚙️</span>
+                <span>Convert</span>
+            </div>
+            <div class="progress-step-connector"></div>
+            <div class="progress-step progress-step--pending" data-step="quantize">
+                <span class="progress-step-icon">📦</span>
+                <span>Quantize</span>
+            </div>
+            <div class="progress-step-connector"></div>
+            <div class="progress-step progress-step--pending" data-step="upload">
+                <span class="progress-step-icon">📤</span>
+                <span>Upload</span>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar">
+            <div class="progress-bar-fill" style="width: 0%;"></div>
+        </div>
+
+        <!-- Transfer Progress Section -->
+        <div class="transfer-progress" style="display: none; margin-bottom: 1rem;">
+            <div class="transfer-header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span class="transfer-title" style="font-size: 0.8rem; color: var(--text-secondary);">Downloading
+                    files...</span>
+                <span class="transfer-count" style="font-size: 0.75rem; color: var(--text-secondary);"></span>
+            </div>
+            <div class="transfer-files"
+                style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 150px; overflow-y: auto; padding: 0.5rem; background: rgba(0,0,0,0.3); border-radius: 6px;">
+            </div>
+        </div>
+
+        <!-- Log Terminal (Hidden by default) -->
+        <div style="margin-bottom: 0.5rem;">
+            <button class="toggle-btn toggle-logs-btn"
+                onclick="this.parentElement.nextElementSibling.classList.toggle('visible'); this.querySelector('span').textContent = this.parentElement.nextElementSibling.classList.contains('visible') ? '▼ Hide Logs' : '▶ Show Logs';">
+                <span>▶ Show Logs</span>
+            </button>
+        </div>
+        <div class="log-terminal logs"></div>
+
+        <!-- Error Section -->
+        <div class="error-section"
+            style="display: none; margin-top: 1rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--status-error);">
+        </div>
+    </div>
+</template>
+
+<!-- Request Card Template (Admin) -->
+<template id="request-card-template">
+    <div class="request-card" data-request-id="">
+        <div class="request-header">
+            <div>
+                <span class="request-model">Model Name</span>
+                <div class="request-by">by <a href="#" target="_blank">username</a></div>
+            </div>
+            <div class="request-actions">
+                <button class="btn btn--success approve-btn">Approve</button>
+                <button class="btn btn--secondary discuss-btn">Discuss</button>
+                <button class="btn btn--danger reject-btn">Reject</button>
+            </div>
+        </div>
+
+        <!-- Requested Quants -->
+        <div class="request-quants requested-quants-display"></div>
+
+        <!-- Quant Editor (hidden by default) -->
+        <div class="requested-quants-row" style="margin-bottom: 0.75rem;">
+            <button type="button" class="toggle-btn edit-quants-btn">
+                ✏️ Edit quants before approving
+            </button>
+        </div>
+        <div class="request-quant-selector hidden"
+            style="margin-bottom: 0.75rem; padding: 0.75rem; background: var(--bg-tertiary); border-radius: var(--radius-sm);">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <span style="font-size: 0.75rem; color: var(--text-secondary);">Modify quants:</span>
+                <div style="display: flex; gap: 0.4rem;">
+                    <button type="button" class="btn btn--ghost req-select-all"
+                        style="font-size: 0.65rem; padding: 0.2rem 0.4rem;">All</button>
+                    <button type="button" class="btn btn--ghost req-select-none"
+                        style="font-size: 0.65rem; padding: 0.2rem 0.4rem;">None</button>
+                    <button type="button" class="btn btn--ghost req-select-user"
+                        style="font-size: 0.65rem; padding: 0.2rem 0.4rem; border-color: var(--status-info); color: var(--status-info);">User's</button>
+                </div>
+            </div>
+            <div class="request-quant-checkboxes quant-grid"></div>
+            <div class="request-quant-count" style="margin-top: 0.5rem; font-size: 0.7rem; color: var(--text-muted);">
+            </div>
+        </div>
+
+        <!-- Ignore Space Check -->
+        <div style="margin-bottom: 0.75rem;">
+            <label
+                style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer;">
+                <input type="checkbox" class="ignore-space-check" style="accent-color: #ff8c00;">
+                <span>⚠ Ignore space check <span style="opacity: 0.7; font-size: 0.7rem;">(bypass 3x model size
+                        requirement)</span></span>
+            </label>
+        </div>
+
+        <!-- Message Input -->
+        <div class="input-group" style="margin-bottom: 0;">
+            <input type="text" class="input-field decline-reason-input"
+                placeholder="Message (for discussion or decline reason)...">
+        </div>
+    </div>
+</template>
+
+<!-- My Request Card Template (User) -->
+<template id="my-request-card-template">
+    <div class="my-request-card request-card" data-request-id="">
+        <div class="request-header">
+            <span class="request-model">Model Name</span>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <span class="request-status status-badge">Status</span>
+                <button class="btn btn--secondary view-ticket-btn" style="display: none;">View Thread</button>
+            </div>
+        </div>
+        <div class="request-quants my-request-quants"></div>
+        <div class="decline-reason"
+            style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: var(--radius-sm); font-size: 0.85rem; color: var(--status-error);">
+        </div>
+    </div>
+</template>
+
+<!-- Ticket Card Template -->
+<template id="ticket-card-template">
+    <div class="ticket-card request-card" data-ticket-id="">
+        <div class="request-header">
+            <div>
+                <span class="ticket-model">Model Name</span>
+                <div class="ticket-by">by <a href="#" target="_blank">username</a></div>
+            </div>
+            <div class="ticket-actions" style="display: flex; gap: 0.5rem; align-items: center;">
+                <span class="ticket-status status-badge">Status</span>
+                <button class="btn btn--secondary ticket-view-btn">Open</button>
+                <button class="btn btn--success ticket-approve-btn">Approve</button>
+                <button class="btn btn--danger ticket-close-btn">Close</button>
+            </div>
+        </div>
+    </div>
+</template>

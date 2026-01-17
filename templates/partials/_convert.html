@@ -1,0 +1,67 @@
+<!-- Convert/Request Section -->
+<div id="section-convert" class="content-section hidden">
+    <div class="section-card">
+        <div class="section-header">
+            <h3 class="section-title">
+                <span class="section-title-icon">{% if role == 'admin' %}🚀{% else %}📝{% endif %}</span>
+                {% if role == 'admin' %}Start Conversion{% else %}Request Conversion{% endif %}
+            </h3>
+        </div>
+
+        <!-- Search Box -->
+        <div class="search-box" style="margin-bottom: 1rem; position: relative;">
+            <span class="search-box-icon">🔍</span>
+            <input type="text" id="modelSearch" placeholder="Search HuggingFace models..." autocomplete="off">
+            {% if role == 'admin' %}
+            <button class="btn btn--primary" onclick="convertModel()">Start</button>
+            {% else %}
+            <button class="btn btn--primary" onclick="requestModel()">Request</button>
+            {% endif %}
+
+            <div id="suggestions" class="glass-panel"
+                style="position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; display: none; margin-top: 0.25rem; background: var(--bg-secondary); z-index: 20;">
+            </div>
+        </div>
+
+        {% if role == 'admin' %}
+        <div style="margin-bottom: 1rem;">
+            <label
+                style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" id="validationCheck" checked style="accent-color: var(--accent-primary);">
+                Validate disk space before starting
+            </label>
+        </div>
+        {% endif %}
+
+        <!-- Quant Selection -->
+        <div style="margin-top: 1.5rem;">
+            <button type="button" class="toggle-btn" onclick="toggleQuantSelector()">
+                <span id="quant-toggle-icon">▶</span>
+                <span>Select Quantization Formats</span>
+                <span style="opacity: 0.6; font-size: 0.7rem;">(optional - defaults to all)</span>
+            </button>
+
+            <div id="quant-selector" class="hidden"
+                style="margin-top: 1rem; padding: 1.25rem; background: var(--bg-tertiary); border-radius: var(--radius-md);">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Choose which quants to
+                        generate:</span>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn--ghost" onclick="selectAllQuants()"
+                            style="font-size: 0.75rem;">All</button>
+                        <button type="button" class="btn btn--ghost" onclick="selectNoQuants()"
+                            style="font-size: 0.75rem;">None</button>
+                        <button type="button" onclick="selectRecommendedQuants()"
+                            style="background: rgba(16, 185, 129, 0.1); color: var(--status-success); border: 1px solid var(--status-success); padding: 0.35rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Recommended</button>
+                    </div>
+                </div>
+                <div id="quant-checkboxes" class="quant-grid">
+                    <!-- Populated by JavaScript -->
+                </div>
+                <div id="quant-selected-count" style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

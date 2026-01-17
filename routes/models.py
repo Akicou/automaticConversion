@@ -83,14 +83,17 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
     if ignore_space_check:
         log_msg += "\n⚠ Admin override: Space check disabled"
     
+    # Track who started this conversion (admin)
+    requested_by = user.get('username', '') if user else ''
+    
     await conn.execute(
-        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, ignore_space_check) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (new_id, req.model_id, "pending", 0, log_msg, "", 1 if ignore_space_check else 0)
+        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, ignore_space_check, requested_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (new_id, req.model_id, "pending", 0, log_msg, "", 1 if ignore_space_check else 0, requested_by)
     )
     await conn.commit()
     await conn.close()
     
-    workflow = ModelWorkflow(new_id, req.model_id, quants_to_run=quants_to_run, ignore_space_check=ignore_space_check)
+    workflow = ModelWorkflow(new_id, req.model_id, quants_to_run=quants_to_run, ignore_space_check=ignore_space_check, requested_by=requested_by)
     background_tasks.add_task(workflow.run_pipeline)
     
     return {"status": "started", "id": new_id, "quants": quants_to_run}

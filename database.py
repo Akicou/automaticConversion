@@ -559,7 +559,8 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             completed_at DATETIME,
             completed_quants TEXT DEFAULT '',
-            ignore_space_check INTEGER DEFAULT 0
+            ignore_space_check INTEGER DEFAULT 0,
+            requested_by TEXT DEFAULT ''
         )
     ''')
     
@@ -572,6 +573,12 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
     # Migration: Add ignore_space_check column if it doesn't exist
     try:
         await conn.execute("ALTER TABLE models ADD COLUMN ignore_space_check INTEGER DEFAULT 0")
+    except:
+        pass  # Column already exists
+    
+    # Migration: Add requested_by column if it doesn't exist
+    try:
+        await conn.execute("ALTER TABLE models ADD COLUMN requested_by TEXT DEFAULT ''")
     except:
         pass  # Column already exists
     
@@ -680,7 +687,8 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
             created_at DATETIME DEFAULT GETDATE(),
             completed_at DATETIME,
             completed_quants NVARCHAR(MAX) DEFAULT '',
-            ignore_space_check BIT DEFAULT 0
+            ignore_space_check BIT DEFAULT 0,
+            requested_by NVARCHAR(255) DEFAULT ''
         )
     ''')
     await conn.commit()
@@ -700,6 +708,16 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
         await conn.execute('''
             IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'ignore_space_check')
             ALTER TABLE models ADD ignore_space_check BIT DEFAULT 0
+        ''')
+        await conn.commit()
+    except:
+        pass
+    
+    # Migration: Add requested_by column if it doesn't exist
+    try:
+        await conn.execute('''
+            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'requested_by')
+            ALTER TABLE models ADD requested_by NVARCHAR(255) DEFAULT ''
         ''')
         await conn.commit()
     except:
