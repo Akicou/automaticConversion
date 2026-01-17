@@ -25,10 +25,17 @@
                 <div class="nav-links">
                     <a href="/" class="nav-item {{ 'active' if request.url.path == '/' else '' }}">Dashboard</a>
                     {% if user %}
-                    <a href="/api/tickets/my"
-                        class="nav-item {{ 'active' if '/tickets' in request.url.path else '' }}">My Requests</a>
+                    {% if role != 'admin' %}
+                    <a href="/#my-requests-list"
+                        class="nav-item {{ 'active' if '#my-requests-list' in request.url.path else '' }}">My
+                        Requests</a>
+                    {% endif %}
                     <div class="user-menu">
-                        <span class="user-name">{{ user.username if user.username else user.name }}</span>
+                        {% if oauth_avatar %}
+                        <img src="{{ oauth_avatar }}" alt="Avatar"
+                            style="width: 24px; height: 24px; border-radius: 50%;">
+                        {% endif %}
+                        <span class="user-name">{{ user }}</span>
                         <a href="/logout" class="nav-btn logout-btn">Logout</a>
                     </div>
                     {% else %}

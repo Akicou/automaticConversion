@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Login - GGUF Forge{% endblock %}
+
+{% block content %}
+<div style="max-width: 400px; margin: 4rem auto;">
+    <div class="glass-panel" style="padding: 2rem;">
+        <h2 style="margin-top: 0; margin-bottom: 1.5rem; text-align: center;">Login</h2>
+
+        {% if error %}
+        <div
+            style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: var(--error); padding: 0.75rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.9rem; text-align: center;">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/login" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div>
+                <label for="username"
+                    style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">Username</label>
+                <input type="text" id="username" name="username" required
+                    style="width: 100%; padding: 0.75rem; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 6px; color: var(--text-primary); box-sizing: border-box;">
+            </div>
+
+            <div>
+                <label for="password"
+                    style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">Password</label>
+                <input type="password" id="password" name="password" required
+                    style="width: 100%; padding: 0.75rem; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 6px; color: var(--text-primary); box-sizing: border-box;">
+            </div>
+
+            <button type="submit" class="primary"
+                style="width: 100%; padding: 0.75rem; margin-top: 0.5rem;">Login</button>
+        </form>
+
+        <div style="margin-top: 1.5rem; position: relative; text-align: center;">
+            <div style="height: 1px; background: var(--glass-border); position: absolute; top: 50%; width: 100%;"></div>
+            <span
+                style="background: var(--card-bg); padding: 0 0.5rem; color: var(--text-secondary); font-size: 0.8rem; position: relative;">OR</span>
+        </div>
+
+        <div style="margin-top: 1.5rem;">
+            <a href="/auth/login"
+                style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; width: 100%; padding: 0.75rem; background: #fff; color: #000; text-decoration: none; border-radius: 6px; font-weight: 500; transition: opacity 0.2s; box-sizing: border-box;">
+                <span style="font-size: 1.2rem;">🤗</span>
+                Login with HuggingFace
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
