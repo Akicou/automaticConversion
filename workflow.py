@@ -46,7 +46,7 @@ def get_quants_list():
 class ModelWorkflow:
     def __init__(self, model_id: str, hf_repo_id: str, resume_mode: bool = False, 
                  completed_quants: Optional[List[str]] = None, quants_to_run: Optional[List[str]] = None,
-                 ignore_space_check: bool = False, requested_by: Optional[str] = None):
+                 ignore_space_check: bool = False):
         self.model_id = model_id
         self.hf_repo_id = hf_repo_id
         self.log_buffer = []
@@ -73,8 +73,6 @@ class ModelWorkflow:
         self.api = None
         # Admin override - skip conservative disk space checks
         self.ignore_space_check = ignore_space_check
-        # Track who requested this conversion
-        self.requested_by = requested_by
     
     async def terminate(self):
         """Request termination of this workflow."""
@@ -476,34 +474,25 @@ class ModelWorkflow:
             total_quants = len(self.quants_to_run)
             completed_count = len(self.completed_quants)
             
-            # Detect CPU cores and configure parallelism
+            # Detect CPU cores
             total_cores = multiprocessing.cpu_count()
-            parallel_jobs = min(PARALLEL_QUANT_JOBS, len(quants_to_process))  # Don't use more jobs than quants
-            cores_per_job = max(1, total_cores // parallel_jobs) if parallel_jobs > 0 else total_cores
+            # Calculate threads per job
+            num_parallel = max(1, min(PARALLEL_QUANT_JOBS, len(quants_to_process)))
+            threads_per_job = max(1, total_cores // num_parallel)
             
             await self.log(f"  CPU cores: {total_cores} total")
-            if parallel_jobs > 1:
-                await self.log(f"  Parallel jobs: {parallel_jobs} (each gets {cores_per_job} cores)")
-                await self.log(f"  Mode: Parallel quantize → immediate upload → delete")
-            else:
-                await self.log(f"  Mode: Sequential quantize → upload → delete")
+            await self.log(f"  Parallel jobs: {num_parallel}")
+            await self.log(f"  Threads per job: {threads_per_job}")
+            await self.log(f"  Mode: Parallel quantize ({num_parallel} at a time)")
             await self.log("")
             
-            # Semaphore to limit concurrent quantization jobs
-            quant_semaphore = asyncio.Semaphore(parallel_jobs) if parallel_jobs > 0 else asyncio.Semaphore(1)
+            # Semaphore to limit parallel quantization jobs
+            semaphore = asyncio.Semaphore(num_parallel)
             
-            # Lock for thread-safe operations on shared state
-            upload_lock = asyncio.Lock()
-            
-            async def process_single_quant(q_type: str):
-                """Process a single quant: quantize, upload, delete."""
-                nonlocal completed_count
-                
-                async with quant_semaphore:
+            async def process_single_quant(q_type: str, overall_idx: int):
+                async with semaphore:
                     self.check_terminated()
-                    
-                    overall_idx = self.quants_to_run.index(q_type) + 1
-                    await self.log(f"  [{overall_idx}/{total_quants}] Processing {q_type}...")
+                    await self.log(f"  [{overall_idx}/{total_quants}] Starting {q_type}...")
                     
                     q_path = CACHE_DIR / f"{quant_base_name}.{q_type}.gguf"
                     quant_start = time.time()
@@ -514,10 +503,11 @@ class ModelWorkflow:
                         if quantize_bin and quantize_bin.parent:
                             current_ld = env.get('LD_LIBRARY_PATH', '')
                             env['LD_LIBRARY_PATH'] = f"{quantize_bin.parent}:{current_ld}"
-                        # Limit threads per job when running in parallel
-                        env['OMP_NUM_THREADS'] = str(cores_per_job)
-                        env['MKL_NUM_THREADS'] = str(cores_per_job)
-                        env['OPENBLAS_NUM_THREADS'] = str(cores_per_job)
+                        
+                        # Apply threads constraint
+                        env['OMP_NUM_THREADS'] = str(threads_per_job)
+                        env['MKL_NUM_THREADS'] = str(threads_per_job)
+                        env['OPENBLAS_NUM_THREADS'] = str(threads_per_job)
                         
                         process = await asyncio.create_subprocess_exec(
                             str(quantize_bin), str(self.fp16_path), str(q_path), q_type,
@@ -536,81 +526,77 @@ class ModelWorkflow:
                         
                         if process.returncode != 0:
                             await self.log(f"      ⚠ {q_type} quantization failed: {stderr.decode()[:200]}")
-                            return None
+                            return
                         
                         self.quant_times.append((q_type, quant_duration))
-                        await self.log(f"      ✓ {q_type} quantized ({self.format_duration(quant_duration)})")
+                        await self.log(f"      ✓ {q_type} Quantized ({self.format_duration(quant_duration)})")
                         
-                        # === UPLOAD (with lock to serialize uploads) ===
+                        # === UPLOAD ===
                         if self.hf_token and self.new_repo_id:
                             self.check_terminated()
                             
-                            async with upload_lock:
-                                filename = f"{quant_base_name}.{q_type}.gguf"
-                                file_size = q_path.stat().st_size if q_path.exists() else 0
-                                size_str = f"{file_size / (1024**3):.2f}GB" if file_size > 0 else ""
-                                
-                                await self.update_transfer_progress(filename, 0, size_str, "Uploading...", "upload")
-                                
-                                try:
-                                    loop = asyncio.get_event_loop()
-                                    await loop.run_in_executor(
-                                        None,
-                                        lambda: self.api.upload_file(
-                                            path_or_fileobj=q_path,
-                                            path_in_repo=filename,
-                                            repo_id=self.new_repo_id,
-                                            repo_type="model"
-                                        )
+                            filename = f"{quant_base_name}.{q_type}.gguf"
+                            file_size = q_path.stat().st_size if q_path.exists() else 0
+                            size_str = f"{file_size / (1024**3):.2f}GB" if file_size > 0 else ""
+                            
+                            await self.update_transfer_progress(filename, 0, size_str, "Uploading...", "upload")
+                            
+                            try:
+                                loop = asyncio.get_event_loop()
+                                await loop.run_in_executor(
+                                    None,
+                                    lambda: self.api.upload_file(
+                                        path_or_fileobj=q_path,
+                                        path_in_repo=filename,
+                                        repo_id=self.new_repo_id,
+                                        repo_type="model"
                                     )
-                                    
-                                    await self.update_transfer_progress(filename, 100, size_str, "Complete", "upload")
-                                    await self.log(f"      ✓ {q_type} uploaded to HuggingFace")
-                                    
-                                    # Save progress to DB for resume capability
-                                    await self.save_completed_quant(q_type)
-                                    
-                                    # Clear transfer progress
-                                    self.clear_transfer_progress()
-                                    await broadcast_transfer_progress(self.model_id, "upload", [])
-                                    
-                                except Exception as e:
-                                    await self.update_transfer_progress(filename, -1, size_str, "Failed", "upload")
-                                    await self.log(f"      ⚠ {q_type} upload failed: {e}")
-                                    return None  # Don't delete the file if upload failed
+                                )
+                                
+                                await self.update_transfer_progress(filename, 100, size_str, "Complete", "upload")
+                                await self.log(f"      ✓ {q_type} Uploaded to HuggingFace")
+                                uploaded_files.append(q_type)
+                                
+                                # Save progress to DB for resume capability
+                                await self.save_completed_quant(q_type)
+                                
+                            except Exception as e:
+                                await self.update_transfer_progress(filename, -1, size_str, "Failed", "upload")
+                                await self.log(f"      ⚠ {q_type} Upload failed: {e}")
+                                # Don't delete the file if upload failed - keep for potential manual recovery or retry
+                                return
                         else:
-                            await self.log(f"      ℹ {q_type} skipping upload (no HF token)")
+                            await self.log(f"      ℹ {q_type} Skipping upload (no HF token)")
+                            uploaded_files.append(q_type)
                         
                         # === DELETE QUANT FILE ===
                         try:
                             loop = asyncio.get_event_loop()
-                            await loop.run_in_executor(None, lambda p=q_path: p.unlink(missing_ok=True))
-                            await self.log(f"      ✓ {q_type} local file deleted")
+                            await loop.run_in_executor(None, lambda: q_path.unlink(missing_ok=True))
                         except Exception as e:
-                            await self.log(f"      ⚠ {q_type} failed to delete: {e}")
+                            await self.log(f"      ⚠ {q_type} Failed to delete: {e}")
                         
-                        return q_type  # Success
+                        # Clear transfer progress for this file
+                        self.transfer_files.pop(f"{quant_base_name}.{q_type}.gguf", None)
+                        await broadcast_transfer_progress(self.model_id, "upload", list(self.transfer_files.values()))
                         
                     except Exception as e:
                         await self.log(f"      ⚠ {q_type} error: {e}")
-                        return None
+                    
+                    # Update overall progress
+                    current_completed = len(uploaded_files)
+                    step_progress = 50 + int(current_completed / total_quants * 40)
+                    await self.progress(step_progress)
+
+            # Create tasks for all quants
+            tasks = []
+            for q_type in quants_to_process:
+                overall_idx = self.quants_to_run.index(q_type) + 1
+                tasks.append(process_single_quant(q_type, overall_idx))
             
-            # Process all quants with controlled parallelism
-            if quants_to_process:
-                tasks = [process_single_quant(q_type) for q_type in quants_to_process]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                
-                # Collect successful uploads
-                for result in results:
-                    if isinstance(result, str):  # q_type string means success
-                        uploaded_files.append(result)
-                    elif isinstance(result, Exception):
-                        await self.log(f"      ⚠ Task error: {result}")
-                
-                # Update progress
-                completed_count = len(uploaded_files)
-                step_progress = 50 + int(completed_count / total_quants * 40)
-                await self.progress(step_progress)
+            # Run all tasks concurrently with semaphore limit
+            if tasks:
+                await asyncio.gather(*tasks)
             
             self.end_step("quantize")
             await self.log("")
@@ -643,11 +629,6 @@ class ModelWorkflow:
                 
                 timing_section = "\n".join(timing_details)
                 
-                # Build requestor credit line
-                requestor_credit = ""
-                if self.requested_by:
-                    requestor_credit = f"| Requested By | [@{self.requested_by}](https://huggingface.co/{self.requested_by}) |"
-                
                 readme_content = f"""---
 tags:
 - gguf
@@ -672,7 +653,6 @@ The following quants are available:
 | GGUF Forge Version | {app_version} |
 | Total Time | {total_time_str} |
 | Avg Time per Quant | {avg_quant_str} |
-{requestor_credit}
 
 ### Step Breakdown
 {timing_section}

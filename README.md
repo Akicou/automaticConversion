@@ -113,9 +113,9 @@ The Dockerfile includes:
 | `OAUTH_CLIENT_SECRET` | HF OAuth secret (optional) |
 | `OAUTH_REDIRECT_URI` | OAuth callback URL |
 | `ADMIN_USERS` | Comma-separated HF usernames for admin access |
+| `PARALLEL_QUANT_JOBS` | Number of simultaneous quantization jobs (default: 2) |
 | `HOST` | Server bind address (default: 0.0.0.0) |
 | `PORT` | Server port (default: 8000) |
-| `PARALLEL_QUANT_JOBS` | Number of parallel quantization jobs (default: 2) |
 | `MSSQL_*` | SQL Server connection settings (optional) |
 
 ### GPU Support (NVIDIA)
@@ -164,6 +164,10 @@ Create a `.env` file in the project root with the following variables:
 
 #### HuggingFace Token
 ```env
+# Parallel Quantization Jobs (default: 2)
+# How many quantizations to run simultaneously. Each job gets total_cores / jobs threads.
+PARALLEL_QUANT_JOBS=2
+
 HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 - **Purpose**: Upload converted models to HuggingFace
@@ -232,10 +236,10 @@ You can also set these environment variables (they have defaults):
   - Useful if you want to share a single llama.cpp installation across multiple projects
   - Example: `LLAMA_CPP_DIR=/opt/llama.cpp` or `LLAMA_CPP_DIR=../shared/llama.cpp`
 - `PARALLEL_QUANT_JOBS`: Number of simultaneous quantization jobs (default: 2)
-  - `1` = Sequential processing (one at a time, uses all CPU cores per job)
-  - `2` = Default (2 jobs in parallel, each gets half the CPU cores)
-  - `4` = Aggressive (4 jobs in parallel, each gets 1/4 of CPU cores)
-  - **Note**: Each job immediately uploads and deletes its file to minimize disk usage
+  - `1` = Sequential (slowest, safest for RAM)
+  - `2` = Default (balanced)
+  - `4` = Aggressive (requires more RAM, faster on high-core systems)
+  - **Note**: CPU cores are divided between parallel jobs. A 16-core system with 2 parallel jobs will give 8 cores to each.
 - `DB_POOL_MIN`: Minimum MSSQL connection pool size (default: 2)
 - `DB_POOL_MAX`: Maximum MSSQL connection pool size (default: 10)
 - `MSSQL_CONN_TIMEOUT`: MSSQL connection timeout in seconds (default: 60)
@@ -433,8 +437,9 @@ Each conversion goes through these steps:
 1. **Setup** (10%): Clone and build llama.cpp
 2. **Download** (30%): Download model from HuggingFace
 3. **Convert** (50%): Convert to FP16 GGUF format
-4. **Quantize + Upload** (80%): Parallel quantization with immediate upload (configurable jobs, each uploaded and deleted immediately)
-5. **README** (100%): Generate and upload README with stats
+4. **Quantize** (80%): Create all quantization levels in parallel (Q2_K, Q3_K_S, Q3_K_M, Q3_K_L, Q4_0, Q4_K_S, Q4_K_M, Q5_0, Q5_K_S, Q5_K_M, Q6_K, Q8_0)
+5. **Upload** (90%): Concurrent upload of all quants to HuggingFace
+6. **README** (100%): Generate and upload README with stats
 
 ### Conversion Stats
 Each conversion tracks:
@@ -448,9 +453,9 @@ Each conversion tracks:
 - The first conversion will take longer as it clones and builds `llama.cpp`
 - Ensure you have enough disk space. A 7B model requires ~15GB for download + ~15GB for FP16 + ~5-10GB per quant
 - All conversions run asynchronously and won't block the server
-- Quantizations run in parallel (configurable via `PARALLEL_QUANT_JOBS`, default: 2 simultaneous jobs)
-- Each parallel job gets an equal share of CPU cores (e.g., 16 cores ÷ 2 jobs = 8 cores each)
-- Files are uploaded immediately after quantization and deleted to minimize disk usage
+- Quantizations run in parallel (configurable via `PARALLEL_QUANT_JOBS`) with CPU cores distributed between jobs
+- Each job performs an immediate upload-and-delete after creation to minimize disk space usage
+- Files are automatically cleaned up after successful upload
 
 ## Troubleshooting
 

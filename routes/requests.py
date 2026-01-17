@@ -194,18 +194,15 @@ async def approve_request(
     if ignore_space_check:
         log_msg += "\n⚠ Admin override: Space check disabled"
     
-    # Get requestor before closing connection
-    requested_by = req.get('requested_by', '')
-    
     await conn.execute(
-        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, ignore_space_check, requested_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (new_id, hf_repo_id, "pending", 0, log_msg, "", 1 if ignore_space_check else 0, requested_by)
+        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, ignore_space_check) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (new_id, hf_repo_id, "pending", 0, log_msg, "", 1 if ignore_space_check else 0)
     )
     await conn.commit()
     await conn.close()
     
-    # Pass approved quants, space check flag, and requestor to workflow
-    workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants, ignore_space_check=ignore_space_check, requested_by=requested_by)
+    # Pass approved quants and space check flag to workflow
+    workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants, ignore_space_check=ignore_space_check)
     background_tasks.add_task(workflow.run_pipeline)
     
     # Broadcast update via WebSocket

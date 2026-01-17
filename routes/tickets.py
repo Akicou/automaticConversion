@@ -309,18 +309,16 @@ async def approve_ticket(
     
     # Start the conversion
     hf_repo_id = req['hf_repo_id']
-    requested_by = req.get('requested_by', '')
     new_id = str(uuid.uuid4())
     quants_msg = ', '.join(approved_quants) if len(approved_quants) < len(available_quants) else 'all quants'
     await conn.execute(
-        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, requested_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (new_id, hf_repo_id, "pending", 0, f"Queued from approved discussion... Quants: {quants_msg}", "", requested_by)
+        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details) VALUES (?, ?, ?, ?, ?, ?)",
+        (new_id, hf_repo_id, "pending", 0, f"Queued from approved discussion... Quants: {quants_msg}", "")
     )
     await conn.commit()
     await conn.close()
     
-    # Pass requestor info to workflow
-    workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants, requested_by=requested_by)
+    workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants)
     background_tasks.add_task(workflow.run_pipeline)
     
     # Broadcast updates via WebSocket
