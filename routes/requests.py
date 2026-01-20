@@ -3,6 +3,7 @@ Request system routes for GGUF Forge.
 """
 import uuid
 import json
+import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 
@@ -42,27 +43,84 @@ def validate_quants(quants: list) -> list:
     return [q for q in quants if q in available]
 
 
+async def validate_hf_repo(repo_id: str) -> tuple[bool, str]:
+    """Validate that the input is a valid HuggingFace model repo.
+
+    Returns (is_valid, error_message).
+    """
+    from huggingface_hub import HfApi
+
+    repo_id = repo_id.strip()
+
+    if not repo_id:
+        return False, "Repository ID cannot be empty"
+
+    if '/' not in repo_id:
+        return False, (
+            "Invalid repository format. Please use 'owner/repo-name' format, "
+            "e.g., 'meta-llama/Llama-2-7b-hf'. "
+            "Note: Discussion titles, search queries, or partial names are not accepted."
+        )
+
+    try:
+        api = HfApi()
+        repo_info_obj = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: api.repo_info(repo_id, repo_type="model")
+        )
+
+        model_extensions = ('.safetensors', '.bin', '.pt', '.gguf', '.pth')
+        model_files = [f for f in repo_info_obj.siblings if f.rfilename.lower().endswith(model_extensions)]
+
+        if not model_files:
+            return False, (
+                f"Repository '{repo_id}' exists but doesn't contain any quantizable model files "
+                "(.safetensors, .bin, .pt, .gguf, .pth)."
+            )
+
+        return True, f"Valid model repository with {len(model_files)} model files"
+
+    except Exception as e:
+        error_str = str(e).lower()
+        if "404" in error_str or "not found" in error_str:
+            return False, (
+                f"Repository '{repo_id}' not found. "
+                "Please check the repository name and ensure it exists on HuggingFace."
+            )
+        elif "private" in error_str or "access denied" in error_str:
+            return False, (
+                f"Repository '{repo_id}' is private or not accessible. "
+                "Only public model repositories can be requested."
+            )
+        else:
+            return False, f"Failed to access repository: {e}"
+
+
 @router.post("/submit")
 async def submit_request(req: ModelRequestSubmit, request: Request):
     """Submit a request for a model to be converted (requires login)."""
     user = await _get_current_user_func(request)
-    
+
     # Require login for submissions (anti-spam)
     if not user:
         raise HTTPException(status_code=401, detail="Login required to submit requests")
-    
+
     requester = user['username']
-    
+
+    # Validate that the repo is a valid HuggingFace model repository
+    is_valid, msg = await validate_hf_repo(req.hf_repo_id)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=msg)
+
     # Check spam protection - pending limit
     allowed, reason = await _spam_protection.check_pending_limit(requester)
     if not allowed:
         raise HTTPException(status_code=429, detail=reason)
-    
+
     # Check spam protection - hourly rate
     allowed, reason = await _spam_protection.can_submit(requester)
     if not allowed:
         raise HTTPException(status_code=429, detail=reason)
-    
+
     # Validate requested quants
     requested_quants = validate_quants(req.requested_quants) if req.requested_quants else []
     requested_quants_json = json.dumps(requested_quants) if requested_quants else ""

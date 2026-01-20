@@ -135,9 +135,53 @@ class ModelWorkflow:
             try:
                 await loop.run_in_executor(None, lambda: shutil.rmtree(self.model_dir, ignore_errors=True))
                 await self.log("  ✓ Safetensors model cleaned up")
-                self.model_dir = None
             except Exception as e:
                 await self.log(f"  ⚠ Failed to cleanup safetensors: {e}")
+            finally:
+                self.model_dir = None
+
+    async def download_with_termination_check(self, filename: str, local_dir: Path):
+        """Download a file with periodic termination checks every 2 seconds.
+
+        This prevents downloads from blocking termination requests indefinitely.
+        """
+        loop = asyncio.get_event_loop()
+
+        async def periodic_check():
+            """Check for termination every 2 seconds."""
+            for _ in range(60):  # Check for up to 2 minutes
+                if self.terminated:
+                    return True
+                await asyncio.sleep(2)
+            return False
+
+        checker_task = asyncio.create_task(periodic_check())
+        try:
+            download_future = loop.run_in_executor(
+                None,
+                lambda: hf_hub_download(
+                    repo_id=self.hf_repo_id,
+                    filename=filename,
+                    local_dir=local_dir,
+                    local_dir_use_symlinks=False
+                )
+            )
+
+            done, pending = await asyncio.wait(
+                [checker_task, download_future],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+
+            for p in pending:
+                p.cancel()
+
+            if checker_task in done:
+                raise Exception("Workflow terminated during download")
+
+            return download_future.result()
+
+        except asyncio.CancelledError:
+            raise Exception("Workflow terminated during download")
 
     def start_step(self, step_name: str):
         """Start timing a step."""
@@ -341,18 +385,10 @@ class ModelWorkflow:
                     
                     # Initialize progress for this file
                     await self.update_transfer_progress(short_name, 0, "", "Starting...", "download")
-                    
-                    # Download file in thread pool
+
+                    # Download file with termination checks
                     try:
-                        await loop.run_in_executor(
-                            None,
-                            lambda f=filename: hf_hub_download(
-                                repo_id=self.hf_repo_id,
-                                filename=f,
-                                local_dir=local_dir,
-                                local_dir_use_symlinks=False
-                            )
-                        )
+                        await self.download_with_termination_check(filename, local_dir)
                         # Mark as complete
                         await self.update_transfer_progress(short_name, 100, "", "Complete", "download")
                     except Exception as e:
