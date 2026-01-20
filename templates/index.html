@@ -2,331 +2,567 @@
 
 {% block head %}
 <style>
+    /* ===== GLOBAL MOBILE FIXES ===== */
+
+    /* Prevent horizontal scroll on mobile */
     .dashboard-container {
+        overflow-x: hidden;
         width: 100%;
+        box-sizing: border-box;
     }
 
+    /* Model card must contain all content */
+    .model-card {
+        overflow: hidden;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Log viewer proper scrolling */
+    .model-card .logs {
+        overflow-x: auto;
+        overflow-y: auto;
+        word-break: break-all;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Request/ticket model names should wrap */
+    .request-model,
+    .ticket-model {
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+
+    /* Mobile responsive styles for dashboard */
     @media (max-width: 768px) {
         .dashboard-container {
             padding-top: 1rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
         }
 
-        .search-input {
-            font-size: 0.9rem !important;
+        .dashboard-container h2 {
+            font-size: 1.1rem !important;
+        }
+
+        .search-panel {
+            flex-direction: column !important;
             padding: 0.75rem !important;
         }
 
-        .card {
-            padding: 1rem !important;
+        .search-panel input {
+            padding: 0.75rem !important;
+            font-size: 0.95rem !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        .search-panel button {
+            width: 100%;
+            margin: 0.5rem 0 0 0 !important;
         }
 
         .model-card {
-            padding: 1rem !important;
+            padding: 0.75rem !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
         }
 
+        .model-card h3,
         .model-name {
+            font-size: 0.85rem !important;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            line-height: 1.3;
+        }
+
+        .model-card-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 0.5rem !important;
+        }
+
+        .model-card-actions {
+            flex-wrap: wrap;
+            width: 100%;
+            gap: 0.5rem;
+        }
+
+        .model-card-actions button,
+        .model-card-actions .status-badge {
+            font-size: 0.7rem !important;
+            padding: 0.25rem 0.5rem !important;
+        }
+
+        /* Log viewer mobile fixes */
+        .model-card .logs {
+            font-size: 0.65rem !important;
+            padding: 0.5rem !important;
+            height: 150px !important;
+            line-height: 1.4 !important;
+            white-space: pre-wrap !important;
+            word-break: break-all !important;
+        }
+
+        .request-card,
+        .ticket-card,
+        .my-request-card {
+            padding: 0.75rem !important;
+        }
+
+        .request-card-header,
+        .ticket-card-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 0.5rem !important;
+        }
+
+        .request-model,
+        .ticket-model {
             font-size: 0.85rem !important;
         }
 
-        .logs {
+        .request-by,
+        .ticket-by {
+            display: block !important;
+            margin-left: 0 !important;
+            margin-top: 0.25rem;
+            font-size: 0.75rem !important;
+        }
+
+        .request-card h4,
+        .ticket-card h4 {
+            font-size: 0.9rem !important;
+            word-break: break-word;
+        }
+
+        .request-actions,
+        .ticket-actions {
+            flex-wrap: wrap;
+            width: 100%;
+            gap: 0.4rem !important;
+        }
+
+        .request-actions button,
+        .ticket-actions button {
+            flex: 1 1 auto;
+            min-width: 70px;
+            font-size: 0.7rem !important;
+            padding: 0.35rem 0.5rem !important;
+        }
+
+        .decline-reason-row {
+            flex-direction: column !important;
+        }
+
+        .decline-reason-input {
+            width: 100% !important;
+            margin-top: 0.5rem;
+        }
+
+        .transfer-progress {
+            padding: 0.5rem !important;
+        }
+
+        .transfer-file-item {
             font-size: 0.65rem !important;
-            height: 150px !important;
+            padding: 0.4rem !important;
         }
 
-        .quant-checkboxes {
-            grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)) !important;
+        .transfer-files {
+            max-height: 100px !important;
         }
 
-        .modal-content {
+        .modal-content,
+        .ticket-modal-content {
             width: 95% !important;
+            max-width: 95% !important;
+            margin: 1rem !important;
             padding: 1rem !important;
         }
 
-        .ticket-messages {
+        .modal-header h3,
+        #ticket-title {
+            font-size: 0.95rem !important;
+        }
+
+        .ticket-messages,
+        #ticket-messages {
             max-height: 40vh !important;
+            font-size: 0.8rem !important;
         }
 
         .message-bubble {
+            max-width: 90% !important;
+            padding: 0.6rem !important;
             font-size: 0.8rem !important;
+        }
+
+        .reply-section input,
+        #ticket-reply-input {
+            font-size: 0.85rem !important;
+            padding: 0.6rem !important;
+        }
+
+        #ticket-reply-section {
+            flex-direction: column !important;
+            gap: 0.5rem !important;
+        }
+
+        #ticket-reply-section button {
+            width: 100% !important;
         }
     }
 
     @media (max-width: 480px) {
         .dashboard-container {
             padding-top: 0.5rem !important;
+            padding-left: 0.25rem !important;
+            padding-right: 0.25rem !important;
         }
 
-        .card {
-            padding: 0.75rem !important;
+        .dashboard-container h2 {
+            font-size: 0.95rem !important;
+            margin-bottom: 0.75rem !important;
+        }
+
+        .search-panel input {
+            font-size: 0.85rem !important;
+            padding: 0.6rem !important;
+        }
+
+        .model-card {
+            padding: 0.6rem !important;
+        }
+
+        .model-card h3,
+        .model-name {
+            font-size: 0.8rem !important;
         }
 
         .status-badge {
-            font-size: 0.65rem !important;
-            padding: 0.2rem 0.4rem !important;
+            font-size: 0.6rem !important;
+            padding: 0.15rem 0.4rem !important;
         }
 
-        .logs {
+        .model-card .logs {
             font-size: 0.6rem !important;
             height: 120px !important;
+            padding: 0.4rem !important;
+        }
+
+        .error-section {
+            font-size: 0.7rem !important;
+            padding: 0.5rem !important;
+        }
+
+        .modal-content,
+        .ticket-modal-content {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            max-height: 90vh !important;
+            margin: 0.5rem !important;
+            border-radius: 8px !important;
+        }
+
+        .ticket-messages,
+        #ticket-messages {
+            max-height: 35vh !important;
+        }
+
+        .message-bubble {
+            font-size: 0.75rem !important;
+            padding: 0.5rem !important;
         }
     }
 
-    /* Validation feedback styles */
-    .search-input.valid {
-        border-color: rgba(74, 222, 128, 0.3);
-    }
-
-    .search-input.invalid {
-        border-color: rgba(239, 68, 68, 0.4);
-    }
-
-    .validation-message {
-        font-size: 0.75rem;
-        margin-top: 0.5rem;
-        display: none;
-    }
-
-    .validation-message.error {
-        display: block;
-        color: var(--error);
-    }
-
-    .validation-message.success {
-        display: block;
-        color: var(--success);
-    }
-
-    /* Loading spinner */
-    .spinner {
-        width: 14px;
-        height: 14px;
-        border: 2px solid var(--border-color);
-        border-top-color: var(--text-primary);
-        border-radius: 50%;
-        animation: spin 0.6s linear infinite;
-    }
-
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-
-    /* Fade animations */
-    .fade-in {
-        animation: fadeIn 0.3s ease;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(4px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Touch-friendly adjustments */
+    /* Touch-friendly tap targets */
     @media (hover: none) and (pointer: coarse) {
-        .btn, button, .quant-toggle, .quant-action-btn {
+
+        button,
+        a,
+        input[type="checkbox"] {
             min-height: 44px;
+            min-width: 44px;
+        }
+
+        .request-actions button,
+        .ticket-actions button {
+            padding: 0.6rem 0.8rem !important;
         }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
+<div class="dashboard-container" style="max-width: 800px; margin: 0 auto; padding-top: 2rem;">
 
     {% if role == 'admin' %}
-    <div class="section" style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
-        <div id="update-status" class="text-muted" style="font-size: 0.75rem;"></div>
+    <!-- Admin Controls Bar -->
+    <div id="admin-controls"
+        style="margin-bottom: 1.5rem; display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
+        <div id="update-status" style="font-size: 0.75rem; color: var(--text-secondary);"></div>
         <button id="update-app-btn" onclick="performAppUpdate()" disabled
-            class="btn btn-secondary"
-            style="opacity: 0.5; cursor: not-allowed; font-size: 0.8rem;">
-            <span id="update-btn-icon">✓</span>
-            <span id="update-btn-text">Up to date</span>
+            style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: not-allowed; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; opacity: 0.5;">
+            <span id="update-btn-icon">🔄</span>
+            <span id="update-btn-text">Check for updates...</span>
         </button>
     </div>
     {% endif %}
 
-    <div class="section">
-        <div class="section-header">
-            <h2>{% if role == 'admin' %}Start Conversion{% else %}Request Conversion{% endif %}</h2>
-        </div>
-
-        <div class="card" style="padding: 0.5rem;">
-            <div class="search-input-container">
-                <input type="text" id="modelSearch" class="search-input"
-                    placeholder="owner/repo-name (e.g., meta-llama/Llama-2-7b-hf)"
-                    autocomplete="off"
-                    style="width: 100%;">
-                {% if role == 'admin' %}
-                <button onclick="convertModel()" class="btn btn-primary" style="margin: 0.5rem;">Start</button>
-                {% else %}
-                <button onclick="requestModel()" class="btn btn-primary" style="margin: 0.5rem;">Request</button>
-                {% endif %}
-
-                <div id="suggestions" class="suggestions"></div>
-            </div>
-
-            <div id="validation-message" class="validation-message"></div>
-
+    <!-- Request Section (Visible to all) -->
+    <div style="margin-bottom: 3rem;">
+        <h2 style="font-weight: 400; font-size: 1.2rem; margin-bottom: 1rem; color: var(--text-secondary);">
+            {% if role == 'admin' %}Start Conversion{% else %}Request Conversion{% endif %}
+        </h2>
+        <div class="glass-panel search-panel"
+            style="padding: 0.5rem; display: flex; align-items: center; position: relative;">
+            <input type="text" id="modelSearch" placeholder="Search HuggingFace models..." autocomplete="off"
+                style="flex-grow: 1; border: none; background: transparent; padding: 1rem; font-size: 1rem; color: var(--text-primary); outline: none;">
             {% if role == 'admin' %}
-            <div style="margin-top: 0.75rem;">
-                <label class="card-actions" style="display: flex; gap: 0.5rem; color: var(--text-muted); font-size: 0.8rem; cursor: pointer;">
-                    <input type="checkbox" id="validationCheck" checked style="accent-color: var(--text-primary);">
-                    <span>Validate disk space</span>
-                </label>
-            </div>
+            <button class="primary" onclick="convertModel()" style="margin: 0.5rem;">Start</button>
+            {% else %}
+            <button class="primary" onclick="requestModel()" style="margin: 0.5rem;">Request</button>
             {% endif %}
 
-            <button type="button" class="quant-toggle" onclick="toggleQuantSelector()">
-                <span id="quant-toggle-icon">▶</span>
-                <span>Quants</span>
-            </button>
+<div id="suggestions" class="glass-panel"
+                style="position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; display: none; margin-top: 0.25rem; background: #050505; z-index: 20;">
+            </div>
+        </div>
+        <div id="validation-message" class="validation-message"></div>
+        {% if role == 'admin' %}
+        <div style="margin-top: 1rem;">
+            <label
+                style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.85rem;">
+                <input type="checkbox" id="validationCheck" checked style="accent-color: var(--text-primary);">
+                Validate disk space
+            </label>
+        </div>
+        {% endif %}
 
-            <div id="quant-selector" class="quant-selector">
-                <div class="quant-selector-header">
-                    <span class="quant-selector-title">Select quantization formats</span>
-                    <div class="quant-actions">
-                        <button type="button" class="quant-action-btn" onclick="selectAllQuants()">All</button>
-                        <button type="button" class="quant-action-btn" onclick="selectNoQuants()">None</button>
-                        <button type="button" class="quant-action-btn recommended" onclick="selectRecommendedQuants()">Recommended</button>
+        <!-- Quant Selection Panel -->
+        <div style="margin-top: 1rem;">
+            <button type="button" id="quant-toggle" onclick="toggleQuantSelector()"
+                style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span id="quant-toggle-icon">▶</span>
+                <span>Select Quants <span style="opacity: 0.7;">(optional - defaults to all)</span></span>
+            </button>
+            <div id="quant-selector"
+                style="display: none; margin-top: 0.75rem; padding: 1rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 8px;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">Select quantization formats:</span>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" onclick="selectAllQuants()"
+                            style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">All</button>
+                        <button type="button" onclick="selectNoQuants()"
+                            style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">None</button>
+                        <button type="button" onclick="selectRecommendedQuants()"
+                            style="background: transparent; border: 1px solid var(--success); color: var(--success); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">Recommended</button>
                     </div>
                 </div>
-                <div id="quant-checkboxes" class="quant-checkboxes"></div>
-                <div id="quant-selected-count" class="quant-count"></div>
+                <div id="quant-checkboxes"
+                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.5rem;">
+                    <!-- Populated by JavaScript -->
+                </div>
+                <div id="quant-selected-count"
+                    style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);"></div>
             </div>
         </div>
     </div>
 
+    <!-- Admin: Pending Requests -->
     {% if role == 'admin' %}
-    <div class="section">
-        <div class="section-header">
-            <h2>Pending Requests</h2>
-            <span id="requests-count" class="text-muted" style="font-size: 0.8rem;"></span>
-        </div>
-        <div id="requests-list">
-            <div class="empty-state">Loading...</div>
+    <div style="margin-bottom: 3rem;">
+        <h2 style="font-weight: 400; font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--text-secondary);">Pending
+            Requests</h2>
+        <div id="requests-list" style="display: grid; gap: 0.75rem;">
+            <div
+                style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">
+                Loading...</div>
         </div>
     </div>
 
-    <div class="section">
-        <div class="section-header">
-            <h2>Active Discussions</h2>
-        </div>
-        <div id="tickets-list">
-            <div class="empty-state">Loading...</div>
+    <!-- Admin: Active Discussions -->
+    <div style="margin-bottom: 3rem;">
+        <h2 style="font-weight: 400; font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--text-secondary);">Active
+            Discussions</h2>
+        <div id="tickets-list" style="display: grid; gap: 0.75rem;">
+            <div
+                style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">
+                Loading...</div>
         </div>
     </div>
     {% endif %}
 
+    <!-- My Requests (Visible to logged-in users) -->
     {% if user and role != 'admin' %}
-    <div class="section">
-        <div class="section-header">
-            <h2>My Requests</h2>
-        </div>
-        <div id="my-requests-list">
-            <div class="empty-state">Loading...</div>
+    <div style="margin-bottom: 3rem;">
+        <h2 style="font-weight: 400; font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--text-secondary);">My
+            Requests</h2>
+        <div id="my-requests-list" style="display: grid; gap: 0.75rem;">
+            <div
+                style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">
+                Loading...</div>
         </div>
     </div>
     {% endif %}
 
-    <div class="section">
-        <div class="section-header">
-            <h2>Conversion Queue</h2>
-        </div>
-        <div id="models-list">
-            <div class="empty-state">No active conversions</div>
+    <!-- Status Board -->
+    <div>
+        <h2 style="font-weight: 400; font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--text-secondary);">Conversion
+            Queue</h2>
+        <div id="models-list" style="display: grid; gap: 1rem;">
+            <div
+                style="text-align: center; color: var(--text-secondary); padding: 2rem; border: 1px dashed var(--glass-border); border-radius: 8px;">
+                No active conversions.</div>
         </div>
     </div>
 </div>
 
 <template id="model-card-template">
-    <div class="model-card" data-model-id="">
-        <div class="model-card-header">
-            <span class="model-name"></span>
-            <div class="model-info">
-                <span class="status-badge"></span>
-                <button class="btn btn-ghost terminate-btn" style="display: none; font-size: 0.75rem; padding: 0.25rem 0.5rem;">Terminate</button>
-                <button class="btn btn-secondary continue-btn" style="display: none; font-size: 0.75rem; padding: 0.25rem 0.5rem;">Continue</button>
-                <button class="btn btn-ghost delete-btn" style="display: none; font-size: 0.75rem; padding: 0.25rem 0.5rem;">Delete</button>
+    <div class="model-card glass-panel" data-model-id="" style="padding: 1.5rem; transition: border-color 0.2s;">
+        <div class="model-card-header"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 class="model-name" style="margin: 0; font-size: 1rem; font-weight: 500;">Model Name</h3>
+            <div class="model-card-actions" style="display: flex; align-items: center; gap: 0.75rem;">
+                <span class="status-badge"
+                    style="font-family: monospace; letter-spacing: 0.05em; font-size: 0.75rem;">Status</span>
+                <button class="continue-btn"
+                    style="display: none; background: var(--success); color: #000; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">Continue</button>
+                <button class="terminate-btn"
+                    style="display: none; background: transparent; color: #ff8c00; border: 1px solid #ff8c00; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">Terminate</button>
+                <button class="delete-btn"
+                    style="display: none; background: transparent; color: var(--error); border: 1px solid var(--error); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">Delete</button>
             </div>
         </div>
-        <div class="progress-bar-bg">
-            <div class="progress-bar-fill" style="width: 0%;"></div>
+        <div class="progress-bar-bg"
+            style="background: rgba(255,255,255,0.05); height: 2px; width: 100%; margin-bottom: 1rem;">
+            <div class="progress-bar-fill"
+                style="background: var(--text-primary); height: 100%; width: 0%; transition: width 0.5s ease;"></div>
         </div>
-        <div class="transfer-progress" style="display: none;">
-            <div class="transfer-header">
-                <span class="transfer-title">Transferring...</span>
-                <span class="transfer-count" style="font-size: 0.7rem;"></span>
+        <!-- Transfer Progress Section (Downloads/Uploads) -->
+        <div class="transfer-progress" style="display: none; margin-bottom: 1rem;">
+            <div class="transfer-header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span class="transfer-title" style="font-size: 0.8rem; color: var(--text-secondary);">Downloading
+                    files...</span>
+                <span class="transfer-count" style="font-size: 0.75rem; color: var(--text-secondary);"></span>
             </div>
-            <div class="transfer-files"></div>
+            <div class="transfer-files"
+                style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 150px; overflow-y: auto; padding: 0.5rem; background: rgba(0,0,0,0.3); border-radius: 6px;">
+            </div>
         </div>
-        <div class="logs"></div>
-        <div class="error-section" style="display: none;"></div>
+        <div class="logs"
+            style="font-family: 'Consolas', 'Monaco', monospace; font-size: 0.75rem; color: #a0e0a0; background: #0a0a0a; padding: 1rem; border-radius: 6px; height: 200px; overflow-x: auto; overflow-y: auto; white-space: pre-wrap; word-break: break-all; line-height: 1.5;">
+        </div>
+        <div class="error-section"
+            style="display: none; margin-top: 1rem; padding: 0.75rem; background: rgba(255,68,68,0.1); border-radius: 4px; font-size: 0.8rem; color: var(--error);">
+        </div>
     </div>
 </template>
 
 <template id="request-card-template">
-    <div class="request-card">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+    <div class="request-card glass-panel" style="padding: 1rem;">
+        <div class="request-card-header"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
             <div>
-                <span class="request-model"></span>
-                <span class="request-by"></span>
+                <span class="request-model" style="font-weight: 500;"></span>
+                <span class="request-by"
+                    style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 0.5rem;"></span>
             </div>
-            <div class="request-actions">
-                <button class="btn btn-success" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">Approve</button>
-                <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">Discuss</button>
-                <button class="btn btn-danger" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">Reject</button>
+            <div class="request-actions" style="display: flex; gap: 0.5rem; align-items: center;">
+                <button class="approve-btn"
+                    style="background: var(--success); color: #000; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Approve</button>
+                <button class="discuss-btn"
+                    style="background: transparent; color: #60a5fa; border: 1px solid #60a5fa; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Discuss</button>
+                <button class="reject-btn"
+                    style="background: transparent; color: var(--error); border: 1px solid var(--error); padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Reject</button>
             </div>
         </div>
-        <div class="request-quants"></div>
-        <div style="margin-bottom: 0.5rem;">
-            <button type="button" class="quant-action-btn edit-quants-btn" style="font-size: 0.7rem;">Edit quants</button>
+        <!-- Requested quants display -->
+        <div class="requested-quants-row" style="margin-bottom: 0.75rem;">
+            <div class="requested-quants-label"
+                style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                Requested quants: <span class="requested-quants-value" style="color: var(--text-primary);"></span>
+            </div>
+            <button type="button" class="edit-quants-btn"
+                style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">
+                ✏️ Edit quants before approving
+            </button>
         </div>
-        <div class="quant-selector" style="display: none; margin-bottom: 0.5rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
-                <span style="font-size: 0.7rem; color: var(--text-muted);">Modify quants</span>
-                <div class="quant-actions">
-                    <button type="button" class="quant-action-btn req-select-all">All</button>
-                    <button type="button" class="quant-action-btn req-select-none">None</button>
-                    <button type="button" class="quant-action-btn" style="border-color: rgba(96, 165, 250, 0.3); color: #60a5fa;">User's</button>
+        <!-- Inline quant selector for admin -->
+        <div class="request-quant-selector"
+            style="display: none; margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.75rem; color: var(--text-secondary);">Modify quants to generate:</span>
+                <div style="display: flex; gap: 0.4rem;">
+                    <button type="button" class="req-select-all"
+                        style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">All</button>
+                    <button type="button" class="req-select-none"
+                        style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">None</button>
+                    <button type="button" class="req-select-user"
+                        style="background: transparent; border: 1px solid #60a5fa; color: #60a5fa; padding: 0.2rem 0.4rem; border-radius: 3px; cursor: pointer; font-size: 0.65rem;">User's</button>
                 </div>
             </div>
-            <div class="request-quant-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.3rem;"></div>
-            <div class="request-quant-count" style="margin-top: 0.4rem; font-size: 0.7rem; color: var(--text-muted);"></div>
+            <div class="request-quant-checkboxes"
+                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 0.3rem;"></div>
+            <div class="request-quant-count"
+                style="margin-top: 0.5rem; font-size: 0.7rem; color: var(--text-secondary);"></div>
         </div>
-        <div style="margin-bottom: 0.5rem;">
-            <label style="display: flex; align-items: center; gap: 0.4rem; color: var(--text-muted); font-size: 0.75rem; cursor: pointer;">
-                <input type="checkbox" class="ignore-space-check" style="accent-color: #f59e0b;">
-                <span>Ignore space check</span>
+        <!-- Admin option to bypass space check -->
+        <div style="margin-bottom: 0.75rem;">
+            <label
+                style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer;">
+                <input type="checkbox" class="ignore-space-check" style="accent-color: #ff8c00; cursor: pointer;">
+                <span>⚠ Ignore space check <span style="opacity: 0.7; font-size: 0.7rem;">(advanced: bypasses 3x model
+                        size requirement)</span></span>
             </label>
         </div>
-        <input type="text" class="decline-input" placeholder="Message (optional)...">
+        <div class="decline-reason-row" style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="text" class="decline-reason-input" placeholder="Message (for discussion or decline reason)..."
+                style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 0.5rem; border-radius: 4px; color: var(--text-primary); font-size: 0.85rem;">
+        </div>
     </div>
 </template>
 
 <template id="my-request-card-template">
-    <div class="request-card" style="padding: 0.75rem;">
+    <div class="my-request-card glass-panel" style="padding: 1rem;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span class="request-model" style="font-size: 0.9rem;"></span>
+            <span class="request-model" style="font-weight: 500;"></span>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <span class="request-status" style="font-family: monospace; font-size: 0.7rem;"></span>
-                <button class="btn btn-secondary view-ticket-btn" style="display: none; font-size: 0.7rem; padding: 0.25rem 0.5rem;">Thread</button>
+                <span class="request-status" style="font-family: monospace; font-size: 0.75rem;"></span>
+                <button class="view-ticket-btn"
+                    style="display: none; background: transparent; color: #60a5fa; border: 1px solid #60a5fa; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">View
+                    Thread</button>
             </div>
         </div>
-        <div class="decline-reason" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: var(--error-dim); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--error);"></div>
+        <div class="decline-reason"
+            style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: rgba(255,68,68,0.1); border-radius: 4px; font-size: 0.85rem; color: var(--error);">
+        </div>
     </div>
 </template>
 
 <template id="ticket-card-template">
-    <div class="request-card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="ticket-card glass-panel" style="padding: 1rem;">
+        <div class="ticket-card-header"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
             <div>
-                <span class="request-model"></span>
-                <span class="request-by"></span>
+                <span class="ticket-model" style="font-weight: 500;"></span>
+                <span class="ticket-by"
+                    style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 0.5rem;"></span>
             </div>
-            <div class="request-actions">
-                <span class="status-badge ticket-status"></span>
-                <button class="btn btn-secondary ticket-view-btn" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">Open</button>
-                <button class="btn btn-success ticket-approve-btn" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">Approve</button>
-                <button class="btn btn-danger ticket-close-btn" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">Close</button>
+            <div class="ticket-actions" style="display: flex; gap: 0.5rem; align-items: center;">
+                <span class="ticket-status"
+                    style="font-family: monospace; font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px;"></span>
+                <button class="ticket-view-btn"
+                    style="background: transparent; color: #60a5fa; border: 1px solid #60a5fa; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Open</button>
+                <button class="ticket-approve-btn"
+                    style="background: var(--success); color: #000; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Approve</button>
+                <button class="ticket-close-btn"
+                    style="background: transparent; color: var(--error); border: 1px solid var(--error); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Close</button>
             </div>
         </div>
     </div>
@@ -342,82 +578,7 @@
     const isAdmin = '{{ role }}' === 'admin';
     let selectedRepoId = '';
 
-    let availableQuants = [];
-    const recommendedQuants = ['Q4_K_M', 'Q5_K_M', 'Q6_K', 'Q8_0'];
-
-    async function loadAvailableQuants() {
-        try {
-            const res = await fetch('/api/quants');
-            const data = await res.json();
-            availableQuants = data.quants || [];
-            renderQuantCheckboxes();
-        } catch (e) {
-            console.error('Failed to load quants:', e);
-        }
-    }
-
-    function renderQuantCheckboxes() {
-        const container = document.getElementById('quant-checkboxes');
-        if (!container) return;
-
-        container.innerHTML = '';
-        availableQuants.forEach(quant => {
-            const label = document.createElement('label');
-            label.className = 'quant-checkbox-label';
-            label.innerHTML = `
-                <input type="checkbox" class="quant-checkbox" value="${quant}" onchange="updateQuantCount()">
-                <span class="quant-checkbox-text">${quant}</span>
-            `;
-            container.appendChild(label);
-        });
-        updateQuantCount();
-    }
-
-    function toggleQuantSelector() {
-        const selector = document.getElementById('quant-selector');
-        const icon = document.getElementById('quant-toggle-icon');
-        selector.classList.toggle('active');
-        icon.textContent = selector.classList.contains('active') ? '▼' : '▶';
-    }
-
-    function getSelectedQuants() {
-        return Array.from(document.querySelectorAll('.quant-checkbox:checked')).map(cb => cb.value);
-    }
-
-    function selectAllQuants() {
-        document.querySelectorAll('.quant-checkbox').forEach(cb => cb.checked = true);
-        updateQuantCount();
-    }
-
-    function selectNoQuants() {
-        document.querySelectorAll('.quant-checkbox').forEach(cb => cb.checked = false);
-        updateQuantCount();
-    }
-
-    function selectRecommendedQuants() {
-        document.querySelectorAll('.quant-checkbox').forEach(cb => {
-            cb.checked = recommendedQuants.includes(cb.value);
-        });
-        updateQuantCount();
-    }
-
-    function updateQuantCount() {
-        const selected = getSelectedQuants();
-        const countEl = document.getElementById('quant-selected-count');
-        if (countEl) {
-            if (selected.length === 0) {
-                countEl.innerHTML = 'All quants will be generated';
-            } else if (selected.length === availableQuants.length) {
-                countEl.innerHTML = `All ${selected.length} quants selected`;
-            } else {
-                countEl.innerHTML = `${selected.length} of ${availableQuants.length} selected`;
-            }
-        }
-    }
-
-    loadAvailableQuants();
-
-    // Client-side validation
+    // ====== VALIDATION ======
     function validateRepoFormat(value) {
         value = value.trim();
 
@@ -441,7 +602,8 @@
             };
         }
 
-        if (value.split('/').some(part => part.length === 0)) {
+        const parts = value.split('/');
+        if (parts.length !== 2 || parts[0].length === 0 || parts[1].length === 0) {
             return {
                 valid: false,
                 message: 'Invalid format. Both owner and repo name are required',
@@ -473,69 +635,142 @@
         }
     }
 
-    searchInput.addEventListener('input', (e) => {
-        const value = e.target.value;
-        const result = validateRepoFormat(value);
+    // Add validation and autocomplete event listener
+    if (searchInput) {
+        let debounceTimer;
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
 
-        if (value.length < 3) {
-            showValidation('none', '');
-            suggestionsBox.classList.remove('active');
-            selectedRepoId = '';
-            return;
-        }
+            const value = e.target.value;
+            const result = validateRepoFormat(value);
 
-        if (!result.valid) {
-            showValidation('error', result.message);
-            selectedRepoId = '';
-        } else {
-            showValidation('success', '');
-            selectedRepoId = value;
-        }
-
-        clearTimeout(searchInput.debounceTimer);
-        searchInput.debounceTimer = setTimeout(() => {
-            if (result.valid) {
-                fetchSuggestions(value);
+            if (value.length < 2) {
+                showValidation('none', '');
+                selectedRepoId = '';
+                suggestionsBox.style.display = 'none';
+                return;
             }
-        }, 300);
-    });
 
-    searchInput.addEventListener('blur', () => {
-        if (selectedRepoId) {
-            searchInput.value = selectedRepoId;
-        }
-    });
-
-    async function fetchSuggestions(query) {
-        try {
-            const res = await fetch(`/api/hf/search?q=${encodeURIComponent(query)}`);
-            const data = await res.json();
-
-            suggestionsBox.innerHTML = '';
-            if (data && data.length > 0) {
-                data.slice(0, 5).forEach((model, idx) => {
-                    const div = document.createElement('div');
-                    div.className = 'suggestion-item' + (idx === 0 ? ' selected' : '');
-                    div.textContent = model.id;
-                    div.onclick = () => {
-                        searchInput.value = model.id;
-                        selectedRepoId = model.id;
-                        showValidation('success', '');
-                        suggestionsBox.classList.remove('active');
-                    };
-                    suggestionsBox.appendChild(div);
-                });
-                suggestionsBox.classList.add('active');
+            if (!result.valid) {
+                showValidation('error', result.message);
+                selectedRepoId = '';
+                suggestionsBox.style.display = 'none';
             } else {
-                suggestionsBox.classList.remove('active');
+                showValidation('success', '');
+                selectedRepoId = value;
+
+                // Trigger autocomplete with debounce
+                debounceTimer = setTimeout(() => fetchSuggestions(value), 300);
             }
+        });
+
+        searchInput.addEventListener('blur', () => {
+            if (selectedRepoId) {
+                searchInput.value = selectedRepoId;
+            }
+            setTimeout(() => {
+                suggestionsBox.style.display = 'none';
+            }, 200);
+        });
+    }
+
+    // ====== QUANT SELECTOR ======
+    let availableQuants = [];
+    let quantDescriptions = {};
+    const recommendedQuants = ['Q4_K_M', 'Q5_K_M', 'Q6_K', 'Q8_0'];
+
+    async function loadAvailableQuants() {
+        try {
+            const res = await fetch('/api/quants');
+            const data = await res.json();
+            availableQuants = data.quants || [];
+            quantDescriptions = data.descriptions || {};
+            renderQuantCheckboxes();
         } catch (e) {
-            console.error(e);
-            suggestionsBox.classList.remove('active');
+            console.error('Failed to load quants:', e);
         }
     }
 
-    // App Update System (Admin only)
+    function renderQuantCheckboxes() {
+        const container = document.getElementById('quant-checkboxes');
+        if (!container) return;
+
+        container.innerHTML = '';
+        availableQuants.forEach(quant => {
+            const label = document.createElement('label');
+            label.style.cssText = 'display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid transparent; transition: all 0.2s;';
+            label.title = quantDescriptions[quant] || quant;
+            label.innerHTML = `
+                <input type="checkbox" class="quant-checkbox" value="${quant}" onchange="updateQuantCount()" style="accent-color: var(--success); cursor: pointer;">
+                <span style="font-size: 0.8rem; font-family: monospace; color: var(--text-primary);">${quant}</span>
+            `;
+            label.onmouseover = () => label.style.borderColor = 'var(--glass-border)';
+            label.onmouseout = () => label.style.borderColor = 'transparent';
+            container.appendChild(label);
+        });
+        updateQuantCount();
+    }
+
+    function toggleQuantSelector() {
+        const selector = document.getElementById('quant-selector');
+        const icon = document.getElementById('quant-toggle-icon');
+        if (selector.style.display === 'none') {
+            selector.style.display = 'block';
+            icon.textContent = '▼';
+        } else {
+            selector.style.display = 'none';
+            icon.textContent = '▶';
+        }
+    }
+
+    function getSelectedQuants() {
+        const checkboxes = document.querySelectorAll('.quant-checkbox:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    function selectAllQuants() {
+        document.querySelectorAll('.quant-checkbox').forEach(cb => cb.checked = true);
+        updateQuantCount();
+    }
+
+    function selectNoQuants() {
+        document.querySelectorAll('.quant-checkbox').forEach(cb => cb.checked = false);
+        updateQuantCount();
+    }
+
+    function selectRecommendedQuants() {
+        document.querySelectorAll('.quant-checkbox').forEach(cb => {
+            cb.checked = recommendedQuants.includes(cb.value);
+        });
+        updateQuantCount();
+    }
+
+    function setSelectedQuants(quants) {
+        document.querySelectorAll('.quant-checkbox').forEach(cb => {
+            cb.checked = quants.includes(cb.value);
+        });
+        updateQuantCount();
+    }
+
+    function updateQuantCount() {
+        const selected = getSelectedQuants();
+        const countEl = document.getElementById('quant-selected-count');
+        if (countEl) {
+            if (selected.length === 0) {
+                countEl.innerHTML = '<span style="color: var(--text-secondary);">No quants selected — <strong>all quants</strong> will be generated</span>';
+            } else if (selected.length === availableQuants.length) {
+                countEl.innerHTML = '<span style="color: var(--success);">All ' + selected.length + ' quants selected</span>';
+            } else {
+                countEl.innerHTML = '<span style="color: var(--success);">' + selected.length + ' of ' + availableQuants.length + ' quants selected: ' + selected.join(', ') + '</span>';
+            }
+        }
+    }
+
+    // Load quants on page load
+    loadAvailableQuants();
+
+    // ====== APP UPDATE SYSTEM (Admin only) ======
+    let updateAvailable = false;
     let updateInfo = null;
 
     async function checkForAppUpdate() {
@@ -543,6 +778,8 @@
 
         const btn = document.getElementById('update-app-btn');
         const statusEl = document.getElementById('update-status');
+        const btnText = document.getElementById('update-btn-text');
+        const btnIcon = document.getElementById('update-btn-icon');
 
         if (!btn) return;
 
@@ -552,26 +789,34 @@
 
             if (data.error) {
                 statusEl.textContent = 'Update check failed';
+                btnText.textContent = 'Update unavailable';
                 return;
             }
 
             updateInfo = data;
+            updateAvailable = data.update_available;
 
-            if (data.update_available) {
+            if (updateAvailable) {
                 btn.disabled = false;
-                btn.style.opacity = '1';
                 btn.style.cursor = 'pointer';
-                btn.style.borderColor = 'rgba(74, 222, 128, 0.3)';
-                document.getElementById('update-btn-icon').textContent = '⬆';
-                document.getElementById('update-btn-text').textContent = `Update (${data.commits_behind})`;
-                statusEl.innerHTML = `<span style="color: var(--text-muted);">v${data.local_commit} → v${data.remote_commit}</span>`;
+                btn.style.opacity = '1';
+                btn.style.borderColor = 'var(--success)';
+                btn.style.color = 'var(--success)';
+                btnIcon.textContent = '⬆️';
+                btnText.textContent = `Update Available (${data.commits_behind} commit${data.commits_behind > 1 ? 's' : ''})`;
+                statusEl.innerHTML = `<span style="color: var(--success);">v${data.local_commit} → v${data.remote_commit}</span>`;
+                if (data.latest_message) {
+                    btn.title = `Latest: ${data.latest_message}`;
+                }
             } else {
                 btn.disabled = true;
-                btn.style.opacity = '0.5';
                 btn.style.cursor = 'not-allowed';
-                document.getElementById('update-btn-icon').textContent = '✓';
-                document.getElementById('update-btn-text').textContent = 'Up to date';
-                statusEl.textContent = `v${data.local_commit}`;
+                btn.style.opacity = '0.5';
+                btn.style.borderColor = 'var(--glass-border)';
+                btn.style.color = 'var(--text-secondary)';
+                btnIcon.textContent = '✓';
+                btnText.textContent = 'Up to date';
+                statusEl.innerHTML = `<span style="opacity: 0.7;">v${data.local_commit}</span>`;
             }
         } catch (e) {
             console.error('Update check failed:', e);
@@ -580,29 +825,49 @@
     }
 
     async function performAppUpdate() {
-        if (!updateInfo || !isAdmin) return;
-
-        if (!confirm(`Update GGUF Forge?\n\nThis will pull ${updateInfo.commits_behind} commits and restart.`)) return;
+        if (!updateAvailable || !isAdmin) return;
 
         const btn = document.getElementById('update-app-btn');
+        const btnText = document.getElementById('update-btn-text');
+        const btnIcon = document.getElementById('update-btn-icon');
         const statusEl = document.getElementById('update-status');
 
+        if (!confirm(`Update GGUF Forge?\n\nThis will:\n• Pull latest changes (${updateInfo.commits_behind} commits)\n• Restart the server\n\nAny running jobs will be interrupted.`)) {
+            return;
+        }
+
         btn.disabled = true;
-        statusEl.textContent = 'Updating...';
+        btn.style.cursor = 'wait';
+        btnIcon.textContent = '⏳';
+        btnText.textContent = 'Updating...';
+        statusEl.textContent = 'Pulling latest changes...';
 
         try {
             const res = await fetch('/api/admin/update-app', { method: 'POST' });
             const data = await res.json();
 
             if (data.status === 'success') {
-                statusEl.innerHTML = '<span style="color: var(--success);">Restarting...</span>';
-                setTimeout(() => pollServerRestart(), 2000);
+                btnIcon.textContent = '🔄';
+                btnText.textContent = 'Restarting...';
+                statusEl.innerHTML = '<span style="color: var(--success);">Update complete! Server restarting...</span>';
+
+                // Poll for server to come back up
+                setTimeout(() => {
+                    statusEl.textContent = 'Waiting for server...';
+                    pollServerRestart();
+                }, 2000);
             } else {
+                btnIcon.textContent = '❌';
+                btnText.textContent = 'Update failed';
                 statusEl.innerHTML = `<span style="color: var(--error);">${data.message}</span>`;
                 btn.disabled = false;
+                btn.style.cursor = 'pointer';
             }
         } catch (e) {
-            statusEl.textContent = 'Restarting...';
+            // Connection lost likely means server is restarting
+            btnIcon.textContent = '🔄';
+            btnText.textContent = 'Restarting...';
+            statusEl.innerHTML = '<span style="color: var(--success);">Server restarting...</span>';
             setTimeout(() => pollServerRestart(), 2000);
         }
     }
@@ -617,29 +882,65 @@
             try {
                 const res = await fetch('/api/health', { cache: 'no-store' });
                 if (res.ok) {
-                    statusEl.innerHTML = '<span style="color: var(--success);">Reload...</span>';
+                    statusEl.innerHTML = '<span style="color: var(--success);">Server is back! Reloading...</span>';
                     setTimeout(() => window.location.reload(), 500);
                     return;
                 }
-            } catch (e) {}
+            } catch (e) {
+                // Server not ready yet
+            }
 
             if (attempts < maxAttempts) {
-                statusEl.textContent = `Waiting... (${attempts}/${maxAttempts})`;
+                statusEl.textContent = `Waiting for server... (${attempts}/${maxAttempts})`;
                 setTimeout(poll, 1000);
             } else {
-                statusEl.textContent = 'Refresh manually';
+                statusEl.innerHTML = '<span style="color: var(--error);">Server not responding. Please refresh manually.</span>';
             }
         };
 
         poll();
     }
 
+// Check for updates on page load (admin only)
     if (isAdmin) {
         setTimeout(checkForAppUpdate, 1000);
+        // Re-check every 5 minutes
         setInterval(checkForAppUpdate, 5 * 60 * 1000);
     }
 
-    async function convertModel() {
+    async function fetchSuggestions(query) {
+        try {
+            const res = await fetch(`/api/hf/search?q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+
+            suggestionsBox.innerHTML = '';
+            if (data && data.length > 0) {
+                data.forEach(model => {
+                    const div = document.createElement('div');
+                    div.textContent = model.id;
+                    div.style.padding = '1rem';
+                    div.style.cursor = 'pointer';
+                    div.style.transition = 'background 0.2s';
+                    div.onmouseover = () => div.style.background = 'rgba(255,255,255,0.05)';
+                    div.onmouseout = () => div.style.background = 'transparent';
+div.onclick = () => {
+                        searchInput.value = model.id;
+                        selectedRepoId = model.id;
+                        showValidation('success', '');
+                        suggestionsBox.style.display = 'none';
+                    };
+                    suggestionsBox.appendChild(div);
+                });
+                suggestionsBox.style.display = 'block';
+            } else {
+                suggestionsBox.style.display = 'none';
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+async function convertModel() {
         const modelId = searchInput.value.trim();
         const validation = validateRepoFormat(modelId);
 
@@ -653,8 +954,8 @@
             return;
         }
 
+        // Collect selected quants (empty array means "all quants")
         const selectedQuants = getSelectedQuants();
-        const ignoreSpace = !document.getElementById('validationCheck')?.checked;
 
         try {
             const res = await fetch('/api/models/process', {
@@ -662,16 +963,16 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     model_id: modelId,
-                    quants: selectedQuants.length > 0 ? selectedQuants : null,
-                    ignore_space_check: ignoreSpace
+                    quants: selectedQuants.length > 0 ? selectedQuants : null
                 })
             });
-
             if (res.ok) {
+                const data = await res.json();
                 searchInput.value = '';
                 showValidation('none', '');
+                // Reset quant selector
                 selectNoQuants();
-                document.getElementById('quant-selector').classList.remove('active');
+                document.getElementById('quant-selector').style.display = 'none';
                 document.getElementById('quant-toggle-icon').textContent = '▶';
                 fetchStatus();
             } else {
@@ -683,7 +984,7 @@
         }
     }
 
-    async function requestModel() {
+async function requestModel() {
         const modelId = searchInput.value.trim();
         const validation = validateRepoFormat(modelId);
 
@@ -697,6 +998,7 @@
             return;
         }
 
+        // Collect selected quants (empty array means "all quants")
         const selectedQuants = getSelectedQuants();
 
         try {
@@ -708,17 +1010,16 @@
                     requested_quants: selectedQuants.length > 0 ? selectedQuants : null
                 })
             });
-
             const data = await res.json();
 
             if (res.ok) {
                 alert(data.message);
                 searchInput.value = '';
                 showValidation('none', '');
+                // Reset quant selector
                 selectNoQuants();
-                document.getElementById('quant-selector').classList.remove('active');
+                document.getElementById('quant-selector').style.display = 'none';
                 document.getElementById('quant-toggle-icon').textContent = '▶';
-                fetchStatus();
             } else {
                 showValidation('error', data.detail || data.message || 'Failed to submit request');
             }
@@ -727,28 +1028,37 @@
         }
     }
 
+    // Consolidated initial data fetch (single request instead of 4)
     async function fetchDashboardInit() {
         try {
             const res = await fetch('/api/dashboard/init');
-            if (!res.ok) throw new Error('Failed');
+            if (!res.ok) {
+                console.error('Failed to fetch dashboard init data');
+                // Fallback to individual fetches
+                fetchStatus();
+                fetchRequests();
+                fetchMyRequests();
+                fetchTickets();
+                return;
+            }
             const data = await res.json();
 
+            // Render all data from single response
             renderModels(data.models || []);
 
             if (isAdmin) {
                 renderRequests(data.requests || []);
                 renderTickets(data.tickets || []);
-            } else if (document.getElementById('my-requests-list')) {
+            } else if (isLoggedIn) {
                 renderMyRequests(data.my_requests || []);
             }
         } catch (e) {
             console.error('Dashboard init failed:', e);
+            // Fallback to individual fetches
             fetchStatus();
-            if (isAdmin) {
-                fetchRequests();
-                fetchTickets();
-            }
+            fetchRequests();
             fetchMyRequests();
+            fetchTickets();
         }
     }
 
@@ -760,55 +1070,921 @@
         } catch (e) { console.error(e); }
     }
 
+    // Store scroll positions for each model's log panel
+    const logScrollPositions = {};
+
+    // Track if user is actively scrolling (to avoid auto-scroll to bottom)
+    const userScrolling = {};
+
     function renderModels(models) {
         const container = document.getElementById('models-list');
         const template = document.getElementById('model-card-template');
 
         if (!models || models.length === 0) {
-            container.innerHTML = '<div class="empty-state">No active conversions</div>';
+            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 2rem; border: 1px dashed var(--glass-border); border-radius: 8px;">No active conversions.</div>';
             return;
         }
 
+        // Clean up empty state message if present
+        const emptyMsg = container.querySelector('div[style*="text-align: center"]');
+        if (emptyMsg) emptyMsg.remove();
+
+        // 1. Mark all existing cards as stale initially
         const existingCards = new Map();
         container.querySelectorAll('.model-card').forEach(card => {
             existingCards.set(card.dataset.modelId, card);
         });
 
+        // 2. Process models
         models.forEach(model => {
             let card = existingCards.get(model.id);
             let logsEl;
+            let shouldAutoScroll = true;
 
             if (card) {
+                // Remove from stale list (it's active)
                 existingCards.delete(model.id);
+
                 logsEl = card.querySelector('.logs');
+                // Check if user is at bottom BEFORE update
+                const tolerance = 50; // pixels
+                shouldAutoScroll = (logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight) <= tolerance;
             } else {
+                // Create new card
                 const clone = template.content.cloneNode(true);
                 card = clone.querySelector('.model-card');
-                card.classList.add('fade-in');
                 card.dataset.modelId = model.id;
                 container.appendChild(clone);
                 logsEl = card.querySelector('.logs');
             }
 
+            // Update content
             card.querySelector('.model-name').textContent = model.hf_repo_id;
 
             const badge = card.querySelector('.status-badge');
             badge.textContent = model.status.toUpperCase();
-            badge.className = 'status-badge';
-            if (model.status === 'complete') badge.classList.add('complete');
-            else if (model.status === 'error') badge.classList.add('error');
-            else if (['pending', 'initializing', 'downloading', 'converting', 'quantizing', 'uploading'].includes(model.status)) badge.classList.add('running');
-            else if (model.status === 'terminated') badge.style.color = '#f59e0b';
-            else if (model.status === 'interrupted') badge.style.color = '#fbbf24';
 
+            if (model.status === 'error') badge.style.color = 'var(--error)';
+            else if (model.status === 'complete') badge.style.color = 'var(--success)';
+            else if (model.status === 'terminated') badge.style.color = '#ff8c00';
+            else if (model.status === 'interrupted') badge.style.color = '#fbbf24';
+            else badge.style.color = ''; // Default color
+
+            // Progress
             card.querySelector('.progress-bar-fill').style.width = `${model.progress}%`;
+
+            // Logs
+            if (logsEl.textContent !== model.log) {
+                logsEl.textContent = model.log;
+                if (shouldAutoScroll) {
+                    logsEl.scrollTop = logsEl.scrollHeight;
+                }
+            }
+
+            // Error details
+            const errorSection = card.querySelector('.error-section');
+            if (model.error_details) {
+                errorSection.style.display = 'block';
+                if (errorSection.textContent !== model.error_details.slice(0, 500)) {
+                    errorSection.textContent = model.error_details.slice(0, 500);
+                }
+            } else {
+                errorSection.style.display = 'none';
+            }
+
+            // Button setup
+            if (isAdmin) {
+                const deleteBtn = card.querySelector('.delete-btn');
+                const terminateBtn = card.querySelector('.terminate-btn');
+                const continueBtn = card.querySelector('.continue-btn');
+
+                // Update click handlers
+                deleteBtn.onclick = () => deleteModel(model.id, model.hf_repo_id);
+                terminateBtn.onclick = () => terminateModel(model.id, model.hf_repo_id);
+                continueBtn.onclick = () => continueModel(model.id, model.hf_repo_id);
+
+                // Show terminate for running jobs
+                const runningStatuses = ['pending', 'initializing', 'downloading', 'converting', 'quantizing', 'uploading'];
+                if (runningStatuses.includes(model.status)) {
+                    terminateBtn.style.display = 'inline-block';
+                    deleteBtn.style.display = 'none';
+                    continueBtn.style.display = 'none';
+                } else if (model.status === 'interrupted') {
+                    // Show Continue button for interrupted jobs
+                    terminateBtn.style.display = 'none';
+                    deleteBtn.style.display = 'inline-block';
+                    continueBtn.style.display = 'inline-block';
+                } else if (model.status === 'error' || model.status === 'complete' || model.status === 'terminated') {
+                    terminateBtn.style.display = 'none';
+                    deleteBtn.style.display = 'inline-block';
+                    continueBtn.style.display = 'none';
+                } else {
+                    terminateBtn.style.display = 'none';
+                    deleteBtn.style.display = 'none';
+                    continueBtn.style.display = 'none';
+                }
+            }
+        });
+
+        // 3. Remove stale cards
+        existingCards.forEach(card => card.remove());
+    }
+
+    async function deleteModel(modelId, modelName) {
+        if (!confirm(`Delete job for "${modelName}"?`)) return;
+
+        try {
+            const res = await fetch(`/api/models/${modelId}`, { method: 'DELETE' });
+            if (res.ok) {
+                fetchStatus();
+            } else {
+                const err = await res.json();
+                alert('Failed to delete: ' + err.detail);
+            }
+        } catch (e) {
+            alert('Failed to delete model');
+        }
+    }
+
+    async function terminateModel(modelId, modelName) {
+        if (!confirm(`Terminate running job for "${modelName}"?\n\nThis will stop the current processing immediately.`)) return;
+
+        try {
+            const res = await fetch(`/api/models/${modelId}/terminate`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message || 'Termination signal sent.');
+                fetchStatus();
+            } else {
+                alert('Failed to terminate: ' + (data.detail || 'Unknown error'));
+            }
+        } catch (e) {
+            alert('Failed to terminate model');
+        }
+    }
+
+    async function continueModel(modelId, modelName) {
+        if (!confirm(`Continue interrupted job for "${modelName}"?\n\nThis will resume quantization from where it left off.`)) return;
+
+        try {
+            const res = await fetch(`/api/models/${modelId}/continue`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message || 'Job resumed.');
+                fetchStatus();
+            } else {
+                alert('Failed to continue: ' + (data.detail || 'Unknown error'));
+            }
+        } catch (e) {
+            alert('Failed to continue model');
+        }
+    }
+
+    // Requests (Admin only)
+    async function fetchRequests() {
+        if (!isAdmin) return;
+        const container = document.getElementById('requests-list');
+        if (!container) return;
+
+        try {
+            const res = await fetch('/api/requests/all');
+            if (!res.ok) {
+                container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No pending requests.</div>';
+                return;
+            }
+            const requests = await res.json();
+            // Server now returns only pending requests - no client-side filtering needed
+            renderRequests(requests);
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No pending requests.</div>';
+        }
+    }
+
+    function renderRequests(requests) {
+        const container = document.getElementById('requests-list');
+        if (!container) return;
+
+        const template = document.getElementById('request-card-template');
+
+        container.innerHTML = '';
+
+        if (requests.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No pending requests.</div>';
+            return;
+        }
+
+        requests.forEach(req => {
+            const clone = template.content.cloneNode(true);
+            const card = clone.querySelector('.request-card');
+            card.dataset.requestId = req.id;
+
+            clone.querySelector('.request-model').textContent = req.hf_repo_id;
+            clone.querySelector('.request-by').textContent = `by ${req.requested_by}`;
+
+            const declineInput = clone.querySelector('.decline-reason-input');
+
+            // Display requested quants
+            const requestedQuants = req.requested_quants || [];
+            const quantsValueEl = clone.querySelector('.requested-quants-value');
+            if (requestedQuants.length > 0) {
+                quantsValueEl.textContent = requestedQuants.join(', ');
+            } else {
+                quantsValueEl.innerHTML = '<em style="opacity: 0.7;">All quants (no preference)</em>';
+            }
+
+            // Set up inline quant selector
+            const quantSelector = clone.querySelector('.request-quant-selector');
+            const checkboxContainer = clone.querySelector('.request-quant-checkboxes');
+            const quantCountEl = clone.querySelector('.request-quant-count');
+
+            // Populate checkboxes
+            availableQuants.forEach(quant => {
+                const label = document.createElement('label');
+                label.style.cssText = 'display: flex; align-items: center; gap: 0.3rem; cursor: pointer; padding: 0.25rem 0.4rem; background: rgba(255,255,255,0.03); border-radius: 3px; font-size: 0.7rem;';
+                label.title = quantDescriptions[quant] || quant;
+                const isRequested = requestedQuants.includes(quant);
+                const isChecked = requestedQuants.length === 0 || isRequested;
+                label.innerHTML = `
+                    <input type="checkbox" class="req-quant-cb" value="${quant}" ${isChecked ? 'checked' : ''} style="accent-color: var(--success); cursor: pointer; width: 12px; height: 12px;">
+                    <span style="font-family: monospace; color: ${isRequested ? '#60a5fa' : 'var(--text-primary)'};">${quant}</span>
+                `;
+                checkboxContainer.appendChild(label);
+            });
+
+            function updateReqQuantCount() {
+                const checked = card.querySelectorAll('.req-quant-cb:checked');
+                const count = checked.length;
+                if (count === 0) {
+                    quantCountEl.innerHTML = '<span style="color: var(--error);">⚠ No quants selected</span>';
+                } else if (count === availableQuants.length) {
+                    quantCountEl.innerHTML = `<span style="color: var(--success);">All ${count} quants</span>`;
+                } else {
+                    quantCountEl.innerHTML = `<span style="color: var(--success);">${count} quants selected</span>`;
+                }
+            }
+
+            // Bind checkbox change events after appending
+            setTimeout(() => {
+                const actualCard = container.querySelector(`.request-card[data-request-id="${req.id}"]`);
+                if (actualCard) {
+                    actualCard.querySelectorAll('.req-quant-cb').forEach(cb => {
+                        cb.addEventListener('change', () => {
+                            const countEl = actualCard.querySelector('.request-quant-count');
+                            const checked = actualCard.querySelectorAll('.req-quant-cb:checked');
+                            const count = checked.length;
+                            if (count === 0) {
+                                countEl.innerHTML = '<span style="color: var(--error);">⚠ No quants selected</span>';
+                            } else if (count === availableQuants.length) {
+                                countEl.innerHTML = `<span style="color: var(--success);">All ${count} quants</span>`;
+                            } else {
+                                countEl.innerHTML = `<span style="color: var(--success);">${count} quants selected</span>`;
+                            }
+                        });
+                    });
+                }
+            }, 0);
+
+            // Edit quants button
+            clone.querySelector('.edit-quants-btn').onclick = function () {
+                const selector = this.closest('.request-card').querySelector('.request-quant-selector');
+                if (selector.style.display === 'none') {
+                    selector.style.display = 'block';
+                    this.textContent = '✕ Close quant editor';
+                } else {
+                    selector.style.display = 'none';
+                    this.textContent = '✏️ Edit quants before approving';
+                }
+            };
+
+            // Quick select buttons
+            clone.querySelector('.req-select-all').onclick = function () {
+                this.closest('.request-card').querySelectorAll('.req-quant-cb').forEach(cb => cb.checked = true);
+                this.closest('.request-card').querySelector('.req-quant-cb').dispatchEvent(new Event('change'));
+            };
+            clone.querySelector('.req-select-none').onclick = function () {
+                this.closest('.request-card').querySelectorAll('.req-quant-cb').forEach(cb => cb.checked = false);
+                this.closest('.request-card').querySelector('.req-quant-cb').dispatchEvent(new Event('change'));
+            };
+            clone.querySelector('.req-select-user').onclick = function () {
+                const cardEl = this.closest('.request-card');
+                cardEl.querySelectorAll('.req-quant-cb').forEach(cb => {
+                    cb.checked = requestedQuants.length === 0 || requestedQuants.includes(cb.value);
+                });
+                cardEl.querySelector('.req-quant-cb').dispatchEvent(new Event('change'));
+            };
+
+            clone.querySelector('.approve-btn').onclick = async () => {
+                const cardEl = container.querySelector(`.request-card[data-request-id="${req.id}"]`);
+                const checkedBoxes = cardEl.querySelectorAll('.req-quant-cb:checked');
+                const approvedQuants = Array.from(checkedBoxes).map(cb => cb.value);
+                const ignoreSpaceCheck = cardEl.querySelector('.ignore-space-check').checked;
+
+                if (approvedQuants.length === 0) {
+                    alert('Please select at least one quant type to generate.');
+                    return;
+                }
+
+                // If all quants selected, send null (means all)
+                const quantsToSend = approvedQuants.length === availableQuants.length ? null : approvedQuants;
+
+                await fetch(`/api/requests/${req.id}/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        approved_quants: quantsToSend,
+                        ignore_space_check: ignoreSpaceCheck
+                    })
+                });
+                fetchRequests();
+                fetchStatus();
+            };
+
+            clone.querySelector('.reject-btn').onclick = async () => {
+                const reason = declineInput ? declineInput.value : '';
+                await fetch(`/api/requests/${req.id}/reject`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: reason })
+                });
+                fetchRequests();
+            };
+
+            clone.querySelector('.discuss-btn').onclick = async () => {
+                const message = declineInput ? declineInput.value : '';
+                try {
+                    const res = await fetch('/api/tickets/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ request_id: req.id, initial_message: message })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        alert(`Discussion thread created! Ticket #${data.ticket_id}`);
+                        fetchRequests();
+                        fetchTickets();
+                    } else {
+                        alert('Failed to create discussion: ' + (data.detail || 'Unknown error'));
+                    }
+                } catch (e) {
+                    alert('Failed to create discussion thread');
+                }
+            };
+
+            container.appendChild(clone);
+
+            // Initialize count display
+            setTimeout(() => {
+                const actualCard = container.querySelector(`.request-card[data-request-id="${req.id}"]`);
+                if (actualCard) {
+                    const firstCb = actualCard.querySelector('.req-quant-cb');
+                    if (firstCb) firstCb.dispatchEvent(new Event('change'));
+                }
+            }, 10);
+        });
+    }
+
+    // Admin Tickets
+    async function fetchTickets() {
+        if (!isAdmin) return;
+        const container = document.getElementById('tickets-list');
+        if (!container) return;
+
+        try {
+            const res = await fetch('/api/tickets/all');
+            if (!res.ok) {
+                container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No active discussions.</div>';
+                return;
+            }
+            const tickets = await res.json();
+            // Server now returns only open tickets - no client-side filtering needed
+            renderTickets(tickets);
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No active discussions.</div>';
+        }
+    }
+
+    function renderTickets(tickets) {
+        const container = document.getElementById('tickets-list');
+        if (!container) return;
+
+        const template = document.getElementById('ticket-card-template');
+
+        container.innerHTML = '';
+
+        if (tickets.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No active discussions.</div>';
+            return;
+        }
+
+        tickets.forEach(ticket => {
+            const clone = template.content.cloneNode(true);
+
+            clone.querySelector('.ticket-model').textContent = ticket.hf_repo_id;
+            clone.querySelector('.ticket-by').textContent = `by ${ticket.requested_by}`;
+
+            const statusBadge = clone.querySelector('.ticket-status');
+            statusBadge.textContent = ticket.status.toUpperCase();
+            if (ticket.status === 'open') {
+                statusBadge.style.background = 'rgba(96, 165, 250, 0.2)';
+                statusBadge.style.color = '#60a5fa';
+            } else {
+                statusBadge.style.background = 'rgba(255,255,255,0.1)';
+                statusBadge.style.color = 'var(--text-secondary)';
+            }
+
+            // View button - opens modal
+            clone.querySelector('.ticket-view-btn').onclick = () => {
+                currentTicketId = ticket.id;
+                showTicketModal(ticket.id);
+            };
+
+            // Approve button - approve the request and close ticket
+            clone.querySelector('.ticket-approve-btn').onclick = async () => {
+                if (!confirm(`Approve conversion for "${ticket.hf_repo_id}"?`)) return;
+                try {
+                    // Use single approve endpoint that handles everything
+                    const res = await fetch(`/api/tickets/${ticket.id}/approve`, { method: 'POST' });
+                    if (res.ok) {
+                        fetchTickets();
+                        fetchRequests();
+                        fetchStatus();
+                    } else {
+                        const data = await res.json();
+                        alert('Failed to approve: ' + (data.detail || 'Unknown error'));
+                    }
+                } catch (e) {
+                    alert('Failed to approve');
+                }
+            };
+
+            // Close button - closes ticket as rejected
+            clone.querySelector('.ticket-close-btn').onclick = async () => {
+                if (!confirm(`Close discussion and reject request for "${ticket.hf_repo_id}"?`)) return;
+                try {
+                    await fetch(`/api/tickets/${ticket.id}/close`, { method: 'POST' });
+                    fetchTickets();
+                } catch (e) {
+                    alert('Failed to close ticket');
+                }
+            };
+
+            container.appendChild(clone);
+        });
+    }
+
+    // My Requests (For logged-in users)
+    const isLoggedIn = '{{ user }}' !== 'None' && '{{ user }}' !== '';
+
+    async function fetchMyRequests() {
+        if (isAdmin || !isLoggedIn) return;
+        const container = document.getElementById('my-requests-list');
+        if (!container) return;
+
+        try {
+            const res = await fetch('/api/requests/my');
+            if (!res.ok) {
+                container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No requests yet.</div>';
+                return;
+            }
+            const requests = await res.json();
+            renderMyRequests(requests);
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No requests yet.</div>';
+        }
+    }
+
+    function renderMyRequests(requests) {
+        const container = document.getElementById('my-requests-list');
+        if (!container) return;
+
+        const template = document.getElementById('my-request-card-template');
+
+        container.innerHTML = '';
+
+        if (requests.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No requests yet.</div>';
+            return;
+        }
+
+        requests.forEach(req => {
+            const clone = template.content.cloneNode(true);
+            const card = clone.querySelector('.my-request-card');
+
+            clone.querySelector('.request-model').textContent = req.hf_repo_id;
+
+            const statusBadge = clone.querySelector('.request-status');
+            statusBadge.textContent = req.status.toUpperCase();
+
+            if (req.status === 'approved') {
+                statusBadge.style.color = 'var(--success)';
+            } else if (req.status === 'rejected') {
+                statusBadge.style.color = 'var(--error)';
+            } else if (req.status === 'discussion') {
+                statusBadge.style.color = '#60a5fa';
+            } else {
+                statusBadge.style.color = 'var(--text-secondary)';
+            }
+
+            // Show View Thread button for discussion status
+            const viewTicketBtn = clone.querySelector('.view-ticket-btn');
+            if (req.status === 'discussion') {
+                viewTicketBtn.style.display = 'inline-block';
+                viewTicketBtn.onclick = () => openTicketModal(req.id);
+            }
+
+            // Show decline reason if rejected
+            if (req.status === 'rejected' && req.decline_reason) {
+                const declineDiv = clone.querySelector('.decline-reason');
+                declineDiv.style.display = 'block';
+                declineDiv.innerHTML = '<strong>Reason:</strong> ' + req.decline_reason;
+            }
+
+            container.appendChild(clone);
+        });
+    }
+
+    // ====== TICKET MODAL SYSTEM ======
+    let currentTicketId = null;
+
+    async function openTicketModal(requestId) {
+        // First get the ticket for this request
+        try {
+            const res = await fetch(`/api/tickets/request/${requestId}`);
+            const data = await res.json();
+
+            if (!data.ticket) {
+                alert('No discussion thread found for this request.');
+                return;
+            }
+
+            currentTicketId = data.ticket.id;
+            showTicketModal(currentTicketId);
+        } catch (e) {
+            console.error(e);
+            alert('Failed to load discussion thread');
+        }
+    }
+
+    function showTicketModal(ticketId) {
+        // Create modal if it doesn't exist
+        let modal = document.getElementById('ticket-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'ticket-modal';
+            modal.innerHTML = `
+                <div class="ticket-modal-backdrop" onclick="closeTicketModal()" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;"></div>
+                <div class="ticket-modal-content glass-panel" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px; max-width: 90vw; max-height: 80vh; z-index: 101; padding: 1.5rem; display: flex; flex-direction: column;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 id="ticket-title" style="margin: 0; font-size: 1.1rem;">Discussion Thread</h3>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <button id="ticket-reopen-btn" onclick="reopenTicket()" style="display: none; background: transparent; color: #60a5fa; border: 1px solid #60a5fa; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Reopen</button>
+                            <button onclick="closeTicketModal()" style="background: transparent; color: var(--text-secondary); border: none; cursor: pointer; font-size: 1.2rem;">&times;</button>
+                        </div>
+                    </div>
+                    <div id="ticket-messages" style="flex: 1; overflow-y: auto; border: 1px solid var(--glass-border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem; background: rgba(0,0,0,0.3); max-height: 300px;">
+                        <div style="text-align: center; color: var(--text-secondary);">Loading...</div>
+                    </div>
+                    <div id="ticket-reply-section" style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="ticket-reply-input" placeholder="Type your message..." style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 0.75rem; border-radius: 6px; color: var(--text-primary);">
+                        <button onclick="sendTicketReply()" class="primary" style="padding: 0.75rem 1.25rem;">Send</button>
+                    </div>
+                    <div id="ticket-closed-notice" style="display: none; text-align: center; color: var(--text-secondary); padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 6px; font-size: 0.9rem;">
+                        This thread is closed. <a href="#" onclick="reopenTicket(); return false;" style="color: #60a5fa;">Reopen to reply</a>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        modal.style.display = 'block';
+        loadTicketMessages(ticketId);
+    }
+
+    function closeTicketModal() {
+        const modal = document.getElementById('ticket-modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        currentTicketId = null;
+    }
+
+    async function loadTicketMessages(ticketId) {
+        const messagesContainer = document.getElementById('ticket-messages');
+
+        try {
+            const res = await fetch(`/api/tickets/${ticketId}/messages`);
+            const data = await res.json();
+
+            // Update title
+            document.getElementById('ticket-title').textContent = `Discussion: ${data.request.hf_repo_id}`;
+
+            // Handle closed status
+            const replySection = document.getElementById('ticket-reply-section');
+            const closedNotice = document.getElementById('ticket-closed-notice');
+            const reopenBtn = document.getElementById('ticket-reopen-btn');
+
+            if (data.ticket.status === 'closed') {
+                replySection.style.display = 'none';
+                closedNotice.style.display = 'block';
+                reopenBtn.style.display = 'inline-block';
+            } else {
+                replySection.style.display = 'flex';
+                closedNotice.style.display = 'none';
+                reopenBtn.style.display = 'none';
+            }
+
+            // Render messages
+            if (data.messages.length === 0) {
+                messagesContainer.innerHTML = '<div style="text-align: center; color: var(--text-secondary);">No messages yet. Start the conversation!</div>';
+                return;
+            }
+
+            messagesContainer.innerHTML = '';
+            data.messages.forEach(msg => {
+                const msgEl = document.createElement('div');
+                msgEl.style.cssText = `margin-bottom: 0.75rem; padding: 0.75rem; border-radius: 6px; ${msg.sender_role === 'admin' ? 'background: rgba(96, 165, 250, 0.15); margin-left: 1rem;' : 'background: rgba(255,255,255,0.05); margin-right: 1rem;'}`;
+
+                const time = new Date(msg.created_at).toLocaleString();
+                msgEl.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">
+                        <span style="font-weight: 500; color: ${msg.sender_role === 'admin' ? '#60a5fa' : 'var(--text-primary)'};">${msg.sender} ${msg.sender_role === 'admin' ? '(Admin)' : ''}</span>
+                        <span>${time}</span>
+                    </div>
+                    <div style="font-size: 0.9rem;">${escapeHtml(msg.message)}</div>
+                `;
+                messagesContainer.appendChild(msgEl);
+            });
+
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        } catch (e) {
+            console.error(e);
+            messagesContainer.innerHTML = '<div style="text-align: center; color: var(--error);">Failed to load messages</div>';
+        }
+    }
+
+    async function sendTicketReply() {
+        if (!currentTicketId) return;
+
+        const input = document.getElementById('ticket-reply-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        try {
+            const res = await fetch(`/api/tickets/${currentTicketId}/reply`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message })
+            });
+
+            if (res.ok) {
+                input.value = '';
+                loadTicketMessages(currentTicketId);
+            } else {
+                const data = await res.json();
+                alert('Failed to send: ' + (data.detail || 'Unknown error'));
+            }
+        } catch (e) {
+            alert('Failed to send message');
+        }
+    }
+
+    async function reopenTicket() {
+        if (!currentTicketId) return;
+
+        try {
+            const res = await fetch(`/api/tickets/${currentTicketId}/reopen`, { method: 'POST' });
+            if (res.ok) {
+                loadTicketMessages(currentTicketId);
+                fetchMyRequests();
+                fetchTickets();
+            } else {
+                const data = await res.json();
+                alert('Failed to reopen: ' + (data.detail || 'Unknown error'));
+            }
+        } catch (e) {
+            alert('Failed to reopen thread');
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Handle Enter key in reply input
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target.id === 'ticket-reply-input') {
+            sendTicketReply();
+        }
+    });
+
+    // ====== WEBSOCKET REAL-TIME UPDATES ======
+    let ws = null;
+    let wsReconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+    const reconnectDelay = 3000;
+
+    function connectWebSocket() {
+        // Determine WebSocket URL (ws:// or wss://)
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws?channel=models&channel=requests&channel=tickets&channel=my_requests`;
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            console.log('WebSocket connected');
+            wsReconnectAttempts = 0;
+            // Use consolidated init endpoint for faster initial load (1 request instead of 4)
+            fetchDashboardInit();
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                handleWebSocketMessage(msg);
+            } catch (e) {
+                console.error('Failed to parse WebSocket message:', e);
+            }
+        };
+
+        ws.onclose = (event) => {
+            console.log('WebSocket closed:', event.code, event.reason);
+            ws = null;
+            // Attempt to reconnect
+            if (wsReconnectAttempts < maxReconnectAttempts) {
+                wsReconnectAttempts++;
+                console.log(`Reconnecting WebSocket (attempt ${wsReconnectAttempts})...`);
+                setTimeout(connectWebSocket, reconnectDelay);
+            } else {
+                console.error('Max WebSocket reconnect attempts reached. Falling back to polling.');
+                startPollingFallback();
+            }
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+
+        // Send periodic pings to keep connection alive
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send('ping');
+            }
+        }, 30000);
+    }
+
+    function handleWebSocketMessage(msg) {
+        const { channel, data } = msg;
+
+        if (!data) return;
+
+        switch (data.type) {
+            case 'model_update':
+                // Single model update - update just that model in the UI
+                updateSingleModel(data.model);
+                break;
+            case 'models_list':
+                // Full models list update
+                renderModels(data.models);
+                break;
+            case 'transfer_progress':
+                // Download/upload progress update
+                updateTransferProgress(data.model_id, data.transfer_type, data.files);
+                break;
+            case 'requests_list':
+                // Requests data received via WebSocket - render directly (no HTTP refetch needed)
+                if (isAdmin) {
+                    renderRequests(data.requests);
+                }
+                break;
+            case 'requests_update':
+                // Legacy signal - fallback to fetch (shouldn't happen with new server)
+                fetchRequests();
+                break;
+            case 'tickets_list':
+                // Tickets data received via WebSocket - render directly (no HTTP refetch needed)
+                if (isAdmin) {
+                    renderTickets(data.tickets);
+                }
+                break;
+            case 'tickets_update':
+                // Legacy signal - fallback to fetch (shouldn't happen with new server)
+                fetchTickets();
+                break;
+            case 'my_requests_update':
+                // User's requests changed - still needs HTTP fetch (user-specific)
+                fetchMyRequests();
+                break;
+            case 'pong':
+                // Ping response - connection is alive
+                break;
+            default:
+                console.log('Unknown WebSocket message type:', data.type);
+        }
+    }
+
+    function updateTransferProgress(modelId, transferType, files) {
+        const container = document.getElementById('models-list');
+        const card = container.querySelector(`.model-card[data-model-id="${modelId}"]`);
+
+        if (!card) return;
+
+        const progressSection = card.querySelector('.transfer-progress');
+        const titleEl = card.querySelector('.transfer-title');
+        const countEl = card.querySelector('.transfer-count');
+        const filesContainer = card.querySelector('.transfer-files');
+
+        // Show or hide based on whether there are files
+        if (!files || files.length === 0) {
+            progressSection.style.display = 'none';
+            return;
+        }
+
+        progressSection.style.display = 'block';
+        titleEl.textContent = transferType === 'download' ? '📥 Downloading files...' : '📤 Uploading files...';
+
+        // Count completed vs total
+        const completed = files.filter(f => f.progress === 100).length;
+        const failed = files.filter(f => f.progress === -1).length;
+        countEl.textContent = `${completed}/${files.length}${failed > 0 ? ` (${failed} failed)` : ''}`;
+
+        // Render each file progress
+        filesContainer.innerHTML = '';
+        files.forEach(file => {
+            const fileEl = document.createElement('div');
+            fileEl.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; font-size: 0.7rem;';
+
+            // Determine status color and icon
+            let statusColor = '#60a5fa';  // Blue for in-progress
+            let statusIcon = '⏳';
+            let barColor = '#60a5fa';
+
+            if (file.progress === 100) {
+                statusColor = 'var(--success)';
+                statusIcon = '✓';
+                barColor = 'var(--success)';
+            } else if (file.progress === -1) {
+                statusColor = 'var(--error)';
+                statusIcon = '✗';
+                barColor = 'var(--error)';
+            } else if (file.progress === 0) {
+                statusIcon = '○';
+            }
+
+            // Truncate filename if too long
+            const shortName = file.name.length > 30 ? file.name.substring(0, 27) + '...' : file.name;
+
+            fileEl.innerHTML = `
+                <span style="color: ${statusColor}; width: 14px; text-align: center;">${statusIcon}</span>
+                <span style="flex: 1; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${file.name}">${shortName}</span>
+                <span style="color: var(--text-secondary); min-width: 50px; text-align: right; font-size: 0.65rem;">${file.size || ''}</span>
+                <div style="width: 80px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;">
+                    <div style="height: 100%; width: ${Math.max(0, file.progress)}%; background: ${barColor}; transition: width 0.3s ease;${file.progress > 0 && file.progress < 100 ? ' animation: pulse 1.5s ease-in-out infinite;' : ''}"></div>
+                </div>
+                <span style="color: ${statusColor}; min-width: 65px; text-align: right; font-size: 0.65rem;">${file.speed || ''}</span>
+            `;
+            filesContainer.appendChild(fileEl);
+        });
+    }
+
+    function updateSingleModel(model) {
+        // Try to update existing model card, or trigger a full refresh
+        const container = document.getElementById('models-list');
+        const existingCard = container.querySelector(`.model-card[data-model-id="${model.id}"]`);
+
+        if (existingCard) {
+            // Update existing card
+            existingCard.querySelector('.model-name').textContent = model.hf_repo_id;
+
+            const badge = existingCard.querySelector('.status-badge');
+            badge.textContent = model.status.toUpperCase();
+
+            if (model.status === 'error') badge.style.color = 'var(--error)';
+            else if (model.status === 'complete') badge.style.color = 'var(--success)';
+            else if (model.status === 'terminated') badge.style.color = '#ff8c00';
+            else if (model.status === 'interrupted') badge.style.color = '#fbbf24';
+            else badge.style.color = '';
+
+            existingCard.querySelector('.progress-bar-fill').style.width = `${model.progress}%`;
+
+            const logsEl = existingCard.querySelector('.logs');
+            const tolerance = 50;
+            const shouldAutoScroll = (logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight) <= tolerance;
 
             if (logsEl.textContent !== model.log) {
                 logsEl.textContent = model.log;
-                logsEl.scrollTop = logsEl.scrollHeight;
+                if (shouldAutoScroll) {
+                    logsEl.scrollTop = logsEl.scrollHeight;
+                }
             }
 
-            const errorSection = card.querySelector('.error-section');
+            const errorSection = existingCard.querySelector('.error-section');
             if (model.error_details) {
                 errorSection.style.display = 'block';
                 errorSection.textContent = model.error_details.slice(0, 500);
@@ -816,10 +1992,11 @@
                 errorSection.style.display = 'none';
             }
 
+            // Update buttons visibility
             if (isAdmin) {
-                const deleteBtn = card.querySelector('.delete-btn');
-                const terminateBtn = card.querySelector('.terminate-btn');
-                const continueBtn = card.querySelector('.continue-btn');
+                const deleteBtn = existingCard.querySelector('.delete-btn');
+                const terminateBtn = existingCard.querySelector('.terminate-btn');
+                const continueBtn = existingCard.querySelector('.continue-btn');
 
                 deleteBtn.onclick = () => deleteModel(model.id, model.hf_repo_id);
                 terminateBtn.onclick = () => terminateModel(model.id, model.hf_repo_id);
@@ -834,357 +2011,31 @@
                     terminateBtn.style.display = 'none';
                     deleteBtn.style.display = 'inline-block';
                     continueBtn.style.display = 'inline-block';
+                } else if (['error', 'complete', 'terminated'].includes(model.status)) {
+                    terminateBtn.style.display = 'none';
+                    deleteBtn.style.display = 'inline-block';
+                    continueBtn.style.display = 'none';
                 } else {
                     terminateBtn.style.display = 'none';
-                    deleteBtn.style.display = model.status === 'error' || model.status === 'complete' || model.status === 'terminated' ? 'inline-block' : 'none';
+                    deleteBtn.style.display = 'none';
                     continueBtn.style.display = 'none';
                 }
             }
-        });
-
-        existingCards.forEach(card => card.remove());
-    }
-
-    async function deleteModel(modelId, modelName) {
-        if (!confirm(`Delete "${modelName}"?`)) return;
-
-        try {
-            const res = await fetch(`/api/models/${modelId}`, { method: 'DELETE' });
-            if (res.ok) fetchStatus();
-            else alert((await res.json()).detail);
-        } catch (e) { alert('Failed to delete'); }
-    }
-
-    async function terminateModel(modelId, modelName) {
-        if (!confirm(`Terminate "${modelName}"?`)) return;
-
-        try {
-            const res = await fetch(`/api/models/${modelId}/terminate`, { method: 'POST' });
-            const data = await res.json();
-            if (res.ok) {
-                alert(data.message || 'Terminated');
-                fetchStatus();
-            } else alert(data.detail || 'Failed');
-        } catch (e) { alert('Failed to terminate'); }
-    }
-
-    async function continueModel(modelId, modelName) {
-        if (!confirm(`Continue "${modelName}"?`)) return;
-
-        try {
-            const res = await fetch(`/api/models/${modelId}/continue`, { method: 'POST' });
-            const data = await res.json();
-            if (res.ok) {
-                alert(data.message || 'Resumed');
-                fetchStatus();
-            } else alert(data.detail || 'Failed');
-        } catch (e) { alert('Failed to continue'); }
-    }
-
-    async function fetchRequests() {
-        if (!isAdmin) return;
-        const container = document.getElementById('requests-list');
-        if (!container) return;
-
-        try {
-            const res = await fetch('/api/requests/all');
-            if (!res.ok) throw new Error();
-            renderRequests(await res.json());
-        } catch (e) {
-            container.innerHTML = '<div class="empty-state">No pending requests</div>';
+        } else {
+            // New model - fetch all to get proper ordering
+            fetchStatus();
         }
     }
 
-    function renderRequests(requests) {
-        const container = document.getElementById('requests-list');
-        const template = document.getElementById('request-card-template');
-        const countEl = document.getElementById('requests-count');
-
-        container.innerHTML = '';
-        if (countEl) countEl.textContent = `${requests.length} pending`;
-
-        if (requests.length === 0) {
-            container.innerHTML = '<div class="empty-state">No pending requests</div>';
-            return;
-        }
-
-        requests.forEach(req => {
-            const clone = template.content.cloneNode(true);
-            const card = clone.querySelector('.request-card');
-            card.classList.add('fade-in');
-
-            clone.querySelector('.request-model').textContent = req.hf_repo_id;
-            clone.querySelector('.request-by').textContent = `by ${req.requested_by}`;
-
-            const requestedQuants = req.requested_quants || [];
-            clone.querySelector('.request-quants').textContent = requestedQuants.length > 0
-                ? `Quants: ${requestedQuants.join(', ')}`
-                : 'All quants requested';
-
-            const approveBtn = clone.querySelector('.btn-success');
-            const discussBtn = clone.querySelector('.btn-secondary');
-            const rejectBtn = clone.querySelector('.btn-danger');
-
-            approveBtn.onclick = () => approveRequest(req.id);
-            discussBtn.onclick = () => openTicket(req.id, req.hf_repo_id);
-            rejectBtn.onclick = () => rejectRequest(req.id);
-
-            container.appendChild(clone);
-        });
+    function startPollingFallback() {
+        console.log('Starting polling fallback...');
+        setInterval(fetchStatus, 3000);
+        setInterval(fetchRequests, 5000);
+        setInterval(fetchMyRequests, 5000);
+        setInterval(fetchTickets, 5000);
     }
 
-    async function approveRequest(requestId) {
-        try {
-            const res = await fetch(`/api/requests/${requestId}/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
-            });
-            if (res.ok) {
-                fetchStatus();
-                fetchRequests();
-            } else alert((await res.json()).detail);
-        } catch (e) { alert('Failed'); }
-    }
-
-    async function rejectRequest(requestId) {
-        const card = document.querySelector(`.request-card[data-request-id="${requestId}"]`);
-        const reason = card?.querySelector('.decline-input').value || '';
-
-        try {
-            const res = await fetch(`/api/requests/${requestId}/reject`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason })
-            });
-            if (res.ok) {
-                fetchRequests();
-            } else alert((await res.json()).detail);
-        } catch (e) { alert('Failed'); }
-    }
-
-    function openTicket(requestId, repoName) {
-        const message = prompt(`Message for discussion about ${repoName}:`);
-        if (!message) return;
-
-        fetch('/api/tickets/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ request_id: requestId, initial_message: message })
-        }).then(res => res.json()).then(data => {
-            if (data.ticket_id) {
-                alert('Discussion opened');
-                fetchRequests();
-                fetchTickets();
-            } else alert(data.detail || 'Failed');
-        });
-    }
-
-    async function fetchTickets() {
-        if (!isAdmin) return;
-        const container = document.getElementById('tickets-list');
-        if (!container) return;
-
-        try {
-            const res = await fetch('/api/tickets/all');
-            if (!res.ok) throw new Error();
-            renderTickets(await res.json());
-        } catch (e) {
-            container.innerHTML = '<div class="empty-state">No active discussions</div>';
-        }
-    }
-
-    function renderTickets(tickets) {
-        const container = document.getElementById('tickets-list');
-        const template = document.getElementById('ticket-card-template');
-
-        container.innerHTML = '';
-
-        if (tickets.length === 0) {
-            container.innerHTML = '<div class="empty-state">No active discussions</div>';
-            return;
-        }
-
-        tickets.forEach(ticket => {
-            const clone = template.content.cloneNode(true);
-            const card = clone.querySelector('.request-card');
-            card.classList.add('fade-in');
-
-            clone.querySelector('.request-model').textContent = ticket.hf_repo_id;
-            clone.querySelector('.request-by').textContent = `by ${ticket.requested_by}`;
-
-            const statusBadge = clone.querySelector('.ticket-status');
-            statusBadge.textContent = ticket.status.toUpperCase();
-            statusBadge.className = 'status-badge';
-            if (ticket.status === 'closed') {
-                statusBadge.style.background = 'rgba(255, 255, 255, 0.05)';
-                statusBadge.style.color = 'var(--text-muted)';
-            }
-
-            clone.querySelector('.ticket-view-btn').onclick = () => openTicketModal(ticket);
-            clone.querySelector('.ticket-approve-btn').onclick = () => approveTicketRequest(ticket.request_id);
-            clone.querySelector('.ticket-close-btn').onclick = () => closeTicket(ticket.id);
-
-            container.appendChild(clone);
-        });
-    }
-
-    async function fetchMyRequests() {
-        const container = document.getElementById('my-requests-list');
-        if (!container) return;
-
-        try {
-            const res = await fetch('/api/requests/my');
-            if (!res.ok) throw new Error();
-            renderMyRequests(await res.json());
-        } catch (e) {
-            container.innerHTML = '<div class="empty-state">No requests yet</div>';
-        }
-    }
-
-    function renderMyRequests(requests) {
-        const container = document.getElementById('my-requests-list');
-        const template = document.getElementById('my-request-card-template');
-
-        container.innerHTML = '';
-
-        if (requests.length === 0) {
-            container.innerHTML = '<div class="empty-state">No requests yet</div>';
-            return;
-        }
-
-        requests.forEach(req => {
-            const clone = template.content.cloneNode(true);
-            const card = clone.querySelector('.my-request-card');
-            card.classList.add('fade-in');
-
-            clone.querySelector('.request-model').textContent = req.hf_repo_id;
-
-            const statusBadge = clone.querySelector('.request-status');
-            statusBadge.textContent = req.status.toUpperCase();
-            statusBadge.className = 'request-status';
-            if (req.status === 'rejected') statusBadge.style.color = 'var(--error)';
-            else if (req.status === 'approved') statusBadge.style.color = 'var(--success)';
-            else statusBadge.style.color = 'var(--text-muted)';
-
-            if (req.decline_reason) {
-                const declineEl = clone.querySelector('.decline-reason');
-                declineEl.style.display = 'block';
-                declineEl.textContent = req.decline_reason;
-            }
-
-            if (req.ticket_id) {
-                clone.querySelector('.view-ticket-btn').style.display = 'inline-block';
-                clone.querySelector('.view-ticket-btn').onclick = () => openTicketModal({ id: req.ticket_id, hf_repo_id: req.hf_repo_id });
-            }
-
-            container.appendChild(clone);
-        });
-    }
-
-    function openTicketModal(ticket) {
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay active';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">${ticket.hf_repo_id}</h3>
-                    <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
-                </div>
-                <div class="ticket-messages" id="ticket-messages-${ticket.id}">
-                    <div class="spinner" style="margin: 1rem auto;"></div>
-                </div>
-                <div class="reply-section">
-                    <input type="text" class="reply-input" id="ticket-reply-${ticket.id}" placeholder="Type a message...">
-                    <button class="btn btn-primary" onclick="sendTicketMessage(${ticket.id})">Send</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        loadTicketMessages(ticket.id);
-    }
-
-    async function loadTicketMessages(ticketId) {
-        const container = document.getElementById(`ticket-messages-${ticketId}`);
-        if (!container) return;
-
-        try {
-            const res = await fetch(`/api/tickets/${ticketId}/messages`);
-            const messages = await res.json();
-
-            container.innerHTML = messages.map(msg => `
-                <div class="message-bubble ${msg.sender_role === 'admin' ? 'admin' : ''}">
-                    <div class="message-meta">${msg.sender} · ${new Date(msg.created_at).toLocaleString()}</div>
-                    ${msg.message}
-                </div>
-            `).join('');
-        } catch (e) {
-            container.innerHTML = '<div class="text-muted" style="text-align: center;">Failed to load messages</div>';
-        }
-    }
-
-    async function sendTicketMessage(ticketId) {
-        const input = document.getElementById(`ticket-reply-${ticketId}`);
-        const message = input.value.trim();
-        if (!message) return;
-
-        try {
-            const res = await fetch(`/api/tickets/${ticketId}/messages`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message })
-            });
-
-            if (res.ok) {
-                input.value = '';
-                loadTicketMessages(ticketId);
-            }
-        } catch (e) {
-            alert('Failed to send');
-        }
-    }
-
-    async function approveTicketRequest(requestId) {
-        if (!confirm('Approve and start conversion?')) return;
-
-        try {
-            const res = await fetch(`/api/requests/${requestId}/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
-            });
-
-            if (res.ok) {
-                document.querySelector('.modal-overlay')?.remove();
-                fetchStatus();
-                fetchTickets();
-                fetchRequests();
-            } else alert((await res.json()).detail);
-        } catch (e) { alert('Failed'); }
-    }
-
-    async function closeTicket(ticketId) {
-        if (!confirm('Close this discussion?')) return;
-
-        try {
-            const res = await fetch(`/api/tickets/${ticketId}/close`, { method: 'POST' });
-            if (res.ok) fetchTickets();
-            else alert((await res.json()).detail);
-        } catch (e) { alert('Failed'); }
-    }
-
-    // Polling
-    setInterval(() => {
-        if (!document.hidden) fetchStatus();
-    }, 3000);
-
-    setInterval(() => {
-        if (!document.hidden && isAdmin) {
-            fetchRequests();
-            fetchTickets();
-        }
-    }, 5000);
-
-    if (!document.hidden) fetchDashboardInit();
+    // Initialize WebSocket connection
+    connectWebSocket();
 </script>
 {% endblock %}
