@@ -380,8 +380,6 @@ Response shows database status:
 - Can submit conversion requests
 - View request status (pending/approved/rejected)
 - See decline reasons if requests are rejected
-- Username is displayed in the navbar (your HuggingFace username)
-- Logout anytime from the user menu
 
 #### Admin Users
 - All user permissions
@@ -389,25 +387,6 @@ Response shows database status:
 - View and manage all pending requests
 - Approve or decline requests with optional reasons
 - Access to full system controls
-
-### Repository Format Requirements
-
-When submitting a model conversion request, you must provide a valid HuggingFace repository identifier in the format `owner/repo-name`.
-
-**Examples:**
-- ✅ Valid: `meta-llama/Llama-2-7b-hf`
-- ✅ Valid: `TheBloke/Llama-2-7B-Chat-GGUF`
-- ❌ Invalid: "heretic intellect 3" (discussion title)
-- ❌ Invalid: "llama" (search query only)
-- ❌ Invalid: just "meta" (incomplete owner name)
-
-**Requirements:**
-1. Must contain exactly one `/` character separating owner and repo name
-2. Repository must exist and be publicly accessible
-3. Repository must contain model files (.safetensors, .bin, .pt, .gguf)
-4. The system validates the repository format before accepting your request
-
-If you receive an error about invalid format, check that you're using the exact repository name from the HuggingFace URL (e.g., `https://huggingface.co/meta-llama/Llama-2-7b-hf` → use `meta-llama/Llama-2-7b-hf`).
 
 ### Converting a Model
 
