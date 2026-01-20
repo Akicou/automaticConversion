@@ -4,6 +4,7 @@ Model conversion routes for GGUF Forge.
 import os
 import uuid
 import json
+import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 
@@ -14,21 +15,68 @@ from managers import HuggingFaceManager
 
 router = APIRouter(prefix="/api")
 
-# Dependency - will be set by main app
 _require_admin_func = None
 
 
 def configure(admin_dependency):
-    """Configure routes with dependencies."""
     global _require_admin_func
     _require_admin_func = admin_dependency
 
 
 async def get_admin(request: Request):
-    """Dependency that uses the configured admin check."""
     if _require_admin_func:
         return await _require_admin_func(request)
     raise HTTPException(status_code=500, detail="Admin dependency not configured")
+
+
+def validate_hf_repo_sync(repo_id: str) -> tuple[bool, str]:
+    """Validate that the input is a valid HuggingFace model repo (synchronous version for admin endpoint).
+
+    Returns (is_valid, error_message).
+    """
+    from huggingface_hub import HfApi
+
+    repo_id = repo_id.strip()
+
+    if not repo_id:
+        return False, "Repository ID cannot be empty"
+
+    if '/' not in repo_id:
+        return False, (
+            "Invalid repository format. Please use 'owner/repo-name' format, "
+            "e.g., 'meta-llama/Llama-2-7b-hf'. "
+            "Note: Discussion titles, search queries, or partial names are not accepted."
+        )
+
+    try:
+        api = HfApi()
+        repo_info_obj = api.repo_info(repo_id, repo_type="model")
+
+        model_extensions = ('.safetensors', '.bin', '.pt', '.gguf', '.pth')
+        model_files = [f for f in repo_info_obj.siblings if f.rfilename.lower().endswith(model_extensions)]
+
+        if not model_files:
+            return False, (
+                f"Repository '{repo_id}' exists but doesn't contain any quantizable model files "
+                "(.safetensors, .bin, .pt, .gguf, .pth)."
+            )
+
+        return True, f"Valid model repository with {len(model_files)} model files"
+
+    except Exception as e:
+        error_str = str(e).lower()
+        if "404" in error_str or "not found" in error_str:
+            return False, (
+                f"Repository '{repo_id}' not found. "
+                "Please check the repository name and ensure it exists on HuggingFace."
+            )
+        elif "private" in error_str or "access denied" in error_str:
+            return False, (
+                f"Repository '{repo_id}' is private or not accessible. "
+                "Only public model repositories can be requested."
+            )
+        else:
+            return False, f"Failed to access repository: {e}"
 
 
 @router.get("/hf/search")
@@ -41,7 +89,6 @@ async def search_hf(q: str):
 
 
 def validate_quants(quants: list) -> list:
-    """Validate quant names against available quants. Returns valid quants only."""
     available = get_quants_list()
     if not quants:
         return []
@@ -50,6 +97,10 @@ def validate_quants(quants: list) -> list:
 
 @router.post("/models/process")
 async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, user = Depends(get_admin)):
+    is_valid, msg = validate_hf_repo_sync(req.model_id)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=msg)
+
     conn = await get_db_connection()
     await conn.execute("SELECT * FROM models WHERE hf_repo_id = ?", (req.model_id,))
     existing = await conn.fetchone()
