@@ -2,9 +2,70 @@
 
 {% block title %}Login - GGUF Forge{% endblock %}
 
+{% block head %}
+<style>
+    .login-container {
+        max-width: 400px;
+        margin: 4rem auto;
+        padding: 0 1rem;
+    }
+
+    .login-form {
+        padding: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .login-container {
+            margin: 2rem auto;
+            padding: 0 0.75rem;
+        }
+
+        .login-form {
+            padding: 1.5rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .login-container {
+            margin: 1.5rem auto;
+            padding: 0 0.5rem;
+        }
+
+        .login-form {
+            padding: 1.25rem;
+        }
+
+        .login-form h2 {
+            font-size: 1.25rem !important;
+            margin-bottom: 1.25rem !important;
+        }
+
+        .login-form input {
+            padding: 0.75rem !important;
+            font-size: 0.95rem !important;
+        }
+
+        .login-form button {
+            padding: 0.75rem !important;
+            font-size: 0.95rem !important;
+        }
+
+        .oauth-button {
+            padding: 0.75rem !important;
+            font-size: 0.9rem !important;
+        }
+    }
+
+    /* Touch-friendly inputs */
+    .login-form input {
+        font-size: 16px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="max-width: 400px; margin: 4rem auto;">
-    <div class="glass-panel" style="padding: 2rem;">
+<div class="login-container">
+    <div class="glass-panel login-form">
         <h2 style="margin-top: 0; margin-bottom: 1.5rem; text-align: center;">Login</h2>
 
         {% if error %}
@@ -41,6 +102,7 @@
 
         <div style="margin-top: 1.5rem;">
             <a href="/auth/login"
+                class="oauth-button"
                 style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; width: 100%; padding: 0.75rem; background: #fff; color: #000; text-decoration: none; border-radius: 6px; font-weight: 500; transition: opacity 0.2s; box-sizing: border-box;">
                 <span style="font-size: 1.2rem;">🤗</span>
                 Login with HuggingFace

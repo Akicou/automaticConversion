@@ -31,23 +31,23 @@ function showTicketModal(ticketId) {
         modal = document.createElement('div');
         modal.id = 'ticket-modal';
         modal.innerHTML = `
-            <div class="ticket-modal-backdrop" onclick="closeTicketModal()" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;"></div>
-            <div class="ticket-modal-content glass-panel" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px; max-width: 90vw; max-height: 80vh; z-index: 101; padding: 1.5rem; display: flex; flex-direction: column;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 id="ticket-title" style="margin: 0; font-size: 1.1rem;">Discussion Thread</h3>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <div class="ticket-modal-backdrop" onclick="closeTicketModal()" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100; -webkit-tap-highlight-color: transparent;"></div>
+            <div class="ticket-modal-content glass-panel" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px; max-width: 95vw; max-height: 85vh; z-index: 101; padding: 1.5rem; display: flex; flex-direction: column; overflow: hidden;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-shrink: 0;">
+                    <h3 id="ticket-title" style="margin: 0; font-size: 1.1rem; word-break: break-word; overflow-wrap: anywhere;">Discussion Thread</h3>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0;">
                         <button id="ticket-reopen-btn" onclick="reopenTicket()" style="display: none; background: transparent; color: #60a5fa; border: 1px solid #60a5fa; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Reopen</button>
-                        <button onclick="closeTicketModal()" style="background: transparent; color: var(--text-secondary); border: none; cursor: pointer; font-size: 1.2rem;">&times;</button>
+                        <button onclick="closeTicketModal()" style="background: transparent; color: var(--text-secondary); border: none; cursor: pointer; font-size: 1.5rem; padding: 0.25rem; line-height: 1; min-width: 40px; min-height: 40px;">&times;</button>
                     </div>
                 </div>
-                <div id="ticket-messages" style="flex: 1; overflow-y: auto; border: 1px solid var(--glass-border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem; background: rgba(0,0,0,0.3); max-height: 300px;">
+                <div id="ticket-messages" style="flex: 1; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--glass-border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem; background: rgba(0,0,0,0.3); min-height: 100px;">
                     <div style="text-align: center; color: var(--text-secondary);">Loading...</div>
                 </div>
-                <div id="ticket-reply-section" style="display: flex; gap: 0.5rem;">
-                    <input type="text" id="ticket-reply-input" placeholder="Type your message..." style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 0.75rem; border-radius: 6px; color: var(--text-primary);">
-                    <button onclick="sendTicketReply()" class="primary" style="padding: 0.75rem 1.25rem;">Send</button>
+                <div id="ticket-reply-section" style="display: flex; gap: 0.5rem; flex-shrink: 0;">
+                    <input type="text" id="ticket-reply-input" placeholder="Type your message..." style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 0.75rem; border-radius: 6px; color: var(--text-primary); min-width: 0;">
+                    <button onclick="sendTicketReply()" class="primary" style="padding: 0.75rem 1.25rem; white-space: nowrap;">Send</button>
                 </div>
-                <div id="ticket-closed-notice" style="display: none; text-align: center; color: var(--text-secondary); padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 6px; font-size: 0.9rem;">
+                <div id="ticket-closed-notice" style="display: none; text-align: center; color: var(--text-secondary); padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 6px; font-size: 0.9rem; flex-shrink: 0;">
                     This thread is closed. <a href="#" onclick="reopenTicket(); return false;" style="color: #60a5fa;">Reopen to reply</a>
                 </div>
             </div>
@@ -56,6 +56,12 @@ function showTicketModal(ticketId) {
     }
 
     modal.style.display = 'block';
+
+    // Prevent body scroll when modal is open
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+
     loadTicketMessages(ticketId);
 }
 
@@ -65,6 +71,11 @@ function closeTicketModal() {
         modal.style.display = 'none';
     }
     currentTicketId = null;
+
+    // Restore body scroll
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
 }
 
 async function loadTicketMessages(ticketId) {

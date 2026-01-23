@@ -4,6 +4,10 @@
 <style>
     /* ===== GLOBAL MOBILE FIXES ===== */
 
+    * {
+        -webkit-tap-highlight-color: transparent;
+    }
+
     /* Prevent horizontal scroll on mobile */
     .dashboard-container {
         overflow-x: hidden;
@@ -34,6 +38,35 @@
         overflow-wrap: anywhere;
     }
 
+    /* Admin controls responsive */
+    #admin-controls {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    /* Search suggestions mobile */
+    #suggestions {
+        position: absolute !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-height: 200px !important;
+        overflow-y: auto !important;
+        z-index: 20 !important;
+    }
+
+    /* Quant selector responsive grid */
+    #quant-checkboxes {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+        gap: 0.5rem !important;
+    }
+
+    /* Request quant checkboxes mobile */
+    .request-quant-checkboxes {
+        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)) !important;
+    }
+
     /* Mobile responsive styles for dashboard */
     @media (max-width: 768px) {
         .dashboard-container {
@@ -44,11 +77,30 @@
 
         .dashboard-container h2 {
             font-size: 1.1rem !important;
+            margin-bottom: 1rem !important;
+        }
+
+        #admin-controls {
+            flex-direction: column;
+            align-items: stretch;
+            margin-bottom: 1rem !important;
+        }
+
+        #admin-controls > div {
+            text-align: center;
+            font-size: 0.8rem !important;
+        }
+
+        #update-app-btn {
+            width: 100%;
+            justify-content: center;
+            font-size: 0.85rem !important;
         }
 
         .search-panel {
             flex-direction: column !important;
             padding: 0.75rem !important;
+            gap: 0.5rem;
         }
 
         .search-panel input {
@@ -60,7 +112,23 @@
 
         .search-panel button {
             width: 100%;
-            margin: 0.5rem 0 0 0 !important;
+            margin: 0 !important;
+            padding: 0.75rem !important;
+            font-size: 0.9rem !important;
+        }
+
+        #quant-toggle {
+            width: 100%;
+            justify-content: center;
+            padding: 0.75rem !important;
+        }
+
+        #quant-selector {
+            padding: 0.75rem !important;
+        }
+
+        #quant-checkboxes {
+            grid-template-columns: repeat(2, 1fr) !important;
         }
 
         .model-card {
@@ -92,7 +160,12 @@
         .model-card-actions button,
         .model-card-actions .status-badge {
             font-size: 0.7rem !important;
-            padding: 0.25rem 0.5rem !important;
+            padding: 0.3rem 0.6rem !important;
+        }
+
+        .model-card-actions button {
+            flex: 1;
+            min-width: 60px;
         }
 
         /* Log viewer mobile fixes */
@@ -103,6 +176,7 @@
             line-height: 1.4 !important;
             white-space: pre-wrap !important;
             word-break: break-all !important;
+            border-radius: 6px !important;
         }
 
         .request-card,
@@ -149,16 +223,32 @@
             flex: 1 1 auto;
             min-width: 70px;
             font-size: 0.7rem !important;
-            padding: 0.35rem 0.5rem !important;
+            padding: 0.5rem 0.6rem !important;
         }
 
         .decline-reason-row {
             flex-direction: column !important;
+            gap: 0.5rem;
         }
 
         .decline-reason-input {
             width: 100% !important;
-            margin-top: 0.5rem;
+            margin-top: 0 !important;
+        }
+
+        /* Requested quants section mobile */
+        .requested-quants-row {
+            flex-direction: column;
+            gap: 0.5rem !important;
+        }
+
+        .edit-quants-btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .request-quant-selector {
+            padding: 0.75rem !important;
         }
 
         .transfer-progress {
@@ -172,46 +262,6 @@
 
         .transfer-files {
             max-height: 100px !important;
-        }
-
-        .modal-content,
-        .ticket-modal-content {
-            width: 95% !important;
-            max-width: 95% !important;
-            margin: 1rem !important;
-            padding: 1rem !important;
-        }
-
-        .modal-header h3,
-        #ticket-title {
-            font-size: 0.95rem !important;
-        }
-
-        .ticket-messages,
-        #ticket-messages {
-            max-height: 40vh !important;
-            font-size: 0.8rem !important;
-        }
-
-        .message-bubble {
-            max-width: 90% !important;
-            padding: 0.6rem !important;
-            font-size: 0.8rem !important;
-        }
-
-        .reply-section input,
-        #ticket-reply-input {
-            font-size: 0.85rem !important;
-            padding: 0.6rem !important;
-        }
-
-        #ticket-reply-section {
-            flex-direction: column !important;
-            gap: 0.5rem !important;
-        }
-
-        #ticket-reply-section button {
-            width: 100% !important;
         }
     }
 
@@ -243,7 +293,12 @@
 
         .status-badge {
             font-size: 0.6rem !important;
-            padding: 0.15rem 0.4rem !important;
+            padding: 0.2rem 0.4rem !important;
+        }
+
+        .model-card-actions button {
+            font-size: 0.65rem !important;
+            padding: 0.25rem 0.4rem !important;
         }
 
         .model-card .logs {
@@ -257,6 +312,94 @@
             padding: 0.5rem !important;
         }
 
+        .request-card,
+        .ticket-card,
+        .my-request-card {
+            padding: 0.6rem !important;
+        }
+
+        .request-actions button,
+        .ticket-actions button {
+            font-size: 0.65rem !important;
+            padding: 0.4rem 0.5rem !important;
+            min-width: 60px;
+        }
+    }
+
+    /* Touch-friendly tap targets */
+    @media (hover: none) and (pointer: coarse) {
+        button,
+        a.nav-btn,
+        input[type="checkbox"],
+        input[type="button"] {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        .model-card-actions button,
+        .request-actions button,
+        .ticket-actions button {
+            min-height: 40px;
+            padding: 0.6rem 0.8rem !important;
+        }
+    }
+
+    /* Modal styles */
+    .modal-content,
+    .ticket-modal-content {
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+
+    .ticket-messages,
+    #ticket-messages {
+        max-height: 45vh;
+    }
+
+    @media (max-width: 768px) {
+        .modal-content,
+        .ticket-modal-content {
+            width: 95% !important;
+            max-width: 95% !important;
+            margin: 1rem !important;
+            padding: 1rem !important;
+            max-height: 85vh !important;
+        }
+
+        .modal-header h3,
+        #ticket-title {
+            font-size: 0.95rem !important;
+        }
+
+        .ticket-messages,
+        #ticket-messages {
+            max-height: 35vh !important;
+            font-size: 0.8rem !important;
+        }
+
+        .message-bubble {
+            max-width: 90% !important;
+            padding: 0.6rem !important;
+            font-size: 0.8rem !important;
+        }
+
+        .reply-section input,
+        #ticket-reply-input {
+            font-size: 0.85rem !important;
+            padding: 0.6rem !important;
+        }
+
+        #ticket-reply-section {
+            flex-direction: column !important;
+            gap: 0.5rem !important;
+        }
+
+        #ticket-reply-section button {
+            width: 100% !important;
+        }
+    }
+
+    @media (max-width: 480px) {
         .modal-content,
         .ticket-modal-content {
             width: 100% !important;
@@ -265,11 +408,12 @@
             max-height: 90vh !important;
             margin: 0.5rem !important;
             border-radius: 8px !important;
+            padding: 0.75rem !important;
         }
 
         .ticket-messages,
         #ticket-messages {
-            max-height: 35vh !important;
+            max-height: 40vh !important;
         }
 
         .message-bubble {
@@ -278,26 +422,23 @@
         }
     }
 
-    /* Touch-friendly tap targets */
-    @media (hover: none) and (pointer: coarse) {
+    /* Validation message mobile */
+    .validation-message {
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
+        min-height: 1.25rem;
+    }
 
-        button,
-        a,
-        input[type="checkbox"] {
-            min-height: 44px;
-            min-width: 44px;
-        }
-
-        .request-actions button,
-        .ticket-actions button {
-            padding: 0.6rem 0.8rem !important;
+    @media (max-width: 480px) {
+        .validation-message {
+            font-size: 0.75rem;
         }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container" style="max-width: 800px; margin: 0 auto; padding-top: 2rem;">
+<div class="dashboard-container" style="max-width: 800px; margin: 0 auto; padding-top: 2rem; overflow-x: hidden;">
 
     {% if role == 'admin' %}
     <!-- Admin Controls Bar -->
@@ -672,6 +813,13 @@
                 suggestionsBox.style.display = 'none';
             }, 200);
         });
+
+        // Close suggestions on click outside (mobile-friendly)
+        document.addEventListener('click', (e) => {
+            if (e.target !== searchInput && !suggestionsBox.contains(e.target)) {
+                suggestionsBox.style.display = 'none';
+            }
+        });
     }
 
     // ====== QUANT SELECTOR ======
@@ -698,14 +846,22 @@
         container.innerHTML = '';
         availableQuants.forEach(quant => {
             const label = document.createElement('label');
-            label.style.cssText = 'display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid transparent; transition: all 0.2s;';
+            label.style.cssText = 'display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.5rem 0.6rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid transparent; transition: all 0.15s; -webkit-tap-highlight-color: transparent;';
             label.title = quantDescriptions[quant] || quant;
             label.innerHTML = `
-                <input type="checkbox" class="quant-checkbox" value="${quant}" onchange="updateQuantCount()" style="accent-color: var(--success); cursor: pointer;">
-                <span style="font-size: 0.8rem; font-family: monospace; color: var(--text-primary);">${quant}</span>
+                <input type="checkbox" class="quant-checkbox" value="${quant}" onchange="updateQuantCount()" style="accent-color: var(--success); cursor: pointer; width: 16px; height: 16px; flex-shrink: 0;">
+                <span style="font-size: 0.8rem; font-family: monospace; color: var(--text-primary); word-break: break-word;">${quant}</span>
             `;
             label.onmouseover = () => label.style.borderColor = 'var(--glass-border)';
             label.onmouseout = () => label.style.borderColor = 'transparent';
+            label.onmousedown = (e) => {
+                e.preventDefault(); // Prevent double-tap zoom
+                setTimeout(() => {
+                    const checkbox = label.querySelector('.quant-checkbox');
+                    checkbox.checked = !checkbox.checked;
+                    updateQuantCount();
+                }, 50);
+            };
             container.appendChild(label);
         });
         updateQuantCount();
@@ -918,12 +1074,10 @@
                 data.forEach(model => {
                     const div = document.createElement('div');
                     div.textContent = model.id;
-                    div.style.padding = '1rem';
-                    div.style.cursor = 'pointer';
-                    div.style.transition = 'background 0.2s';
+                    div.style.cssText = 'padding: 0.85rem; cursor: pointer; transition: background 0.15s; word-break: break-word; overflow-wrap: anywhere; font-size: 0.9rem;';
                     div.onmouseover = () => div.style.background = 'rgba(255,255,255,0.05)';
                     div.onmouseout = () => div.style.background = 'transparent';
-div.onclick = () => {
+                    div.onclick = () => {
                         searchInput.value = model.id;
                         selectedRepoId = model.id;
                         showValidation('success', '');

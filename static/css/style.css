@@ -19,10 +19,13 @@ body {
     background-color: var(--bg-color);
     color: var(--text-primary);
     line-height: 1.5;
-    background-image: 
+    background-image:
         radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
         radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
     background-attachment: fixed;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Layout */
@@ -39,6 +42,18 @@ body {
     margin: 0 auto;
     padding: 2rem;
     box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-content {
+        padding: 0.75rem;
+    }
 }
 
 /* Navigation */
@@ -59,6 +74,57 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+@media (max-width: 768px) {
+    .nav-content {
+        padding: 0 0.75rem;
+    }
+
+    .nav-links {
+        gap: 0.75rem;
+    }
+
+    .nav-item {
+        font-size: 0.85rem;
+        padding: 0.4rem;
+    }
+
+    .nav-btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .nav-content {
+        padding: 0 0.5rem;
+    }
+
+    .nav-links {
+        gap: 0.5rem;
+    }
+
+    .nav-item {
+        font-size: 0.8rem;
+    }
+
+    .logo-text {
+        font-size: 0.95rem;
+    }
+
+    .user-menu {
+        gap: 0.5rem;
+        padding-left: 0.5rem;
+    }
+
+    .user-name {
+        font-size: 0.8rem;
+        max-width: 80px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 }
 
 .nav-logo {
@@ -164,6 +230,32 @@ body {
     font-size: 0.85rem;
 }
 
+@media (max-width: 768px) {
+    .footer-content {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .footer-links {
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .footer-content {
+        padding: 0 0.75rem;
+    }
+
+    .footer-content p {
+        font-size: 0.8rem;
+    }
+
+    .footer-links a {
+        font-size: 0.8rem;
+    }
+}
+
 .footer-links {
     display: flex;
     gap: 1.5rem;
@@ -185,6 +277,13 @@ body {
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(8px);
     border-radius: 12px;
+    overflow: hidden;
+}
+
+@media (max-width: 480px) {
+    .glass-panel {
+        border-radius: 8px;
+    }
 }
 
 button {
@@ -206,9 +305,30 @@ button.primary:hover {
     background: var(--primary-hover);
 }
 
+button:active {
+    transform: scale(0.98);
+}
+
+/* Prevent text selection on buttons and links */
+button, a.nav-btn {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Better touch feedback */
+@media (hover: none) and (pointer: coarse) {
+    button:active,
+    a.nav-btn:active {
+        opacity: 0.7;
+    }
+}
+
 input[type="text"], input[type="password"], input[type="email"] {
     font-family: inherit;
     transition: border-color 0.2s;
+    font-size: 16px;
 }
 
 input:focus {
@@ -242,4 +362,31 @@ input:focus {
 
 .validation-message.success {
     color: var(--success);
+}
+
+/* Custom scrollbar for webkit browsers (better on mobile) */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 768px) {
+    /* Smaller scrollbars on mobile */
+    ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
 }
