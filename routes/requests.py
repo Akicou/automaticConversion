@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 
 from database import get_db_connection
 from models import ModelRequestSubmit, RejectRequest, ApproveRequestBody
-from workflow import ModelWorkflow, get_quants_list
+from workflow import ModelWorkflow, get_quants_list, get_model_queue
 from websocket_manager import broadcast_requests_update, broadcast_my_requests_update
 
 router = APIRouter(prefix="/api/requests")
@@ -203,7 +203,14 @@ async def approve_request(
     
     # Pass approved quants and space check flag to workflow
     workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants, ignore_space_check=ignore_space_check)
-    background_tasks.add_task(workflow.run_pipeline)
+    
+    # Add to queue instead of running directly
+    queue = get_model_queue()
+    if queue:
+        await queue.add(workflow)
+    else:
+        # Fallback to direct execution if queue not initialized
+        background_tasks.add_task(workflow.run_pipeline)
     
     # Broadcast update via WebSocket
     await broadcast_requests_update()

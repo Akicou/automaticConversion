@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from database import get_db_connection
 from models import TicketMessage, CreateTicketRequest
 from websocket_manager import broadcast_tickets_update, broadcast_requests_update, broadcast_my_requests_update
-from workflow import get_quants_list
+from workflow import get_quants_list, get_model_queue
 
 
 class ApproveTicketBody(BaseModel):
@@ -319,7 +319,14 @@ async def approve_ticket(
     await conn.close()
     
     workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants)
-    background_tasks.add_task(workflow.run_pipeline)
+    
+    # Add to queue instead of running directly
+    queue = get_model_queue()
+    if queue:
+        await queue.add(workflow)
+    else:
+        # Fallback to direct execution if queue not initialized
+        background_tasks.add_task(workflow.run_pipeline)
     
     # Broadcast updates via WebSocket
     await broadcast_tickets_update()

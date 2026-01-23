@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 
 from database import get_db_connection
 from models import ProcessRequest
-from workflow import ModelWorkflow, running_workflows, get_quants_list
+from workflow import ModelWorkflow, running_workflows, get_quants_list, get_model_queue
 from managers import HuggingFaceManager, LlamaCppManager
 
 router = APIRouter(prefix="/api")
@@ -140,9 +140,16 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
         quants_to_run=quants_to_run,
         force_llama_update=req.force_llama_update if hasattr(req, 'force_llama_update') else False
     )
-    background_tasks.add_task(workflow.run_pipeline)
     
-    return {"status": "started", "id": new_id, "quants": quants_to_run}
+    # Add to queue instead of running directly
+    queue = get_model_queue()
+    if queue:
+        await queue.add(workflow)
+    else:
+        # Fallback to direct execution if queue not initialized
+        background_tasks.add_task(workflow.run_pipeline)
+    
+    return {"status": "queued", "id": new_id, "quants": quants_to_run}
 
 
 @router.get("/status/all")
@@ -260,14 +267,74 @@ async def continue_model(model_id: str, background_tasks: BackgroundTasks, user 
         resume_mode=True,
         completed_quants=completed_quants
     )
-    background_tasks.add_task(workflow.run_pipeline)
+    
+    # Add to queue instead of running directly
+    queue = get_model_queue()
+    if queue:
+        await queue.add(workflow)
+    else:
+        # Fallback to direct execution if queue not initialized
+        background_tasks.add_task(workflow.run_pipeline)
     
     return {
-        "status": "continued", 
-        "message": f"Job resumed. {len(completed_quants)} quants already done, {len(remaining_quants)} remaining.",
+        "status": "queued", 
+        "message": f"Job resumed and added to queue. {len(completed_quants)} quants already done, {len(remaining_quants)} remaining.",
         "completed": completed_quants,
         "remaining": remaining_quants
     }
+
+
+@router.get("/queue/status")
+async def get_queue_status(user = Depends(get_admin)):
+    """Admin only: Get current model queue status.
+    
+    Returns information about currently processing model and waiting models.
+    """
+    queue = get_model_queue()
+    if not queue:
+        return {
+            "enabled": False,
+            "message": "Queue system not initialized"
+        }
+    
+    status = queue.get_status()
+    
+    # Enrich with model details from database
+    conn = await get_db_connection()
+    try:
+        result = {
+            "enabled": True,
+            "current_model": None,
+            "queue": []
+        }
+        
+        # Get current model details
+        if status["current_model_id"]:
+            await conn.execute("SELECT * FROM models WHERE id = ?", (status["current_model_id"],))
+            current = await conn.fetchone()
+            if current:
+                result["current_model"] = {
+                    "id": current["id"],
+                    "hf_repo_id": current["hf_repo_id"],
+                    "status": current["status"],
+                    "progress": current["progress"]
+                }
+        
+        # Get queued models details
+        for item in status["queue"]:
+            await conn.execute("SELECT * FROM models WHERE id = ?", (item["model_id"],))
+            model = await conn.fetchone()
+            if model:
+                result["queue"].append({
+                    "position": item["position"],
+                    "id": model["id"],
+                    "hf_repo_id": model["hf_repo_id"],
+                    "status": model["status"]
+                })
+        
+        return result
+    finally:
+        await conn.close()
 
 
 @router.post("/llama-cpp/update")

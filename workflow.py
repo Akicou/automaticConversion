@@ -28,6 +28,9 @@ PARALLEL_QUANT_JOBS = None
 # Global registry for running workflows (for termination support)
 running_workflows: dict = {}  # model_id -> ModelWorkflow instance
 
+# Global model queue instance
+model_queue = None
+
 
 def set_workflow_config(cache_dir: Path, llama_cpp_dir: Path, quants: list, parallel_jobs: int):
     """Set configuration for workflow module."""
@@ -41,6 +44,174 @@ def set_workflow_config(cache_dir: Path, llama_cpp_dir: Path, quants: list, para
 def get_quants_list():
     """Get the list of quants to process."""
     return QUANTS
+
+
+class ModelQueue:
+    """Queue system to process one model at a time.
+    
+    Ensures only one model workflow runs at any given time, preventing
+    resource contention from multiple simultaneous downloads/quantizations.
+    """
+    
+    def __init__(self):
+        self.queue = asyncio.Queue()
+        self.current_workflow = None
+        self.worker_task = None
+        self._queue_list = []  # Track queue for status reporting
+        
+    async def add(self, workflow: "ModelWorkflow"):
+        """Add a workflow to the queue."""
+        import logging
+        logger = logging.getLogger("GGUF_Forge")
+        
+        self._queue_list.append({
+            "model_id": workflow.model_id,
+            "hf_repo_id": workflow.hf_repo_id,
+            "added_at": asyncio.get_event_loop().time()
+        })
+        
+        queue_position = len(self._queue_list)
+        logger.info(f"Model {workflow.hf_repo_id} added to queue (position {queue_position})")
+        
+        # Update model status in database
+        from database import get_db_connection
+        conn = await get_db_connection()
+        try:
+            if queue_position == 1 and self.current_workflow is None:
+                # First in queue and nothing processing - will start immediately
+                await conn.execute(
+                    "UPDATE models SET log = ? WHERE id = ?",
+                    (f"In queue (position 1) - starting immediately...\nQuants: {', '.join(workflow.quants_to_run) if hasattr(workflow, 'quants_to_run') and workflow.quants_to_run else 'all'}", workflow.model_id)
+                )
+            else:
+                await conn.execute(
+                    "UPDATE models SET log = ? WHERE id = ?",
+                    (f"In queue (position {queue_position}) - waiting for other models to complete...\nQuants: {', '.join(workflow.quants_to_run) if hasattr(workflow, 'quants_to_run') and workflow.quants_to_run else 'all'}", workflow.model_id)
+                )
+            await conn.commit()
+        finally:
+            await conn.close()
+        
+        await self.queue.put(workflow)
+        
+        # Broadcast queue update via WebSocket
+        from websocket_manager import manager as ws_manager
+        await ws_manager.broadcast({
+            "type": "queue_update",
+            "queue_size": self.queue.qsize(),
+            "current_model": self.current_workflow.model_id if self.current_workflow else None
+        })
+        
+    def start_worker(self):
+        """Start the background worker that processes the queue."""
+        import logging
+        logger = logging.getLogger("GGUF_Forge")
+        logger.info("Starting model queue worker...")
+        self.worker_task = asyncio.create_task(self._worker())
+        
+    async def _worker(self):
+        """Background worker that processes workflows one at a time."""
+        import logging
+        logger = logging.getLogger("GGUF_Forge")
+        logger.info("Model queue worker started")
+        
+        while True:
+            try:
+                # Wait for next workflow in queue
+                workflow = await self.queue.get()
+                self.current_workflow = workflow
+                
+                # Remove from tracking list
+                self._queue_list = [item for item in self._queue_list if item["model_id"] != workflow.model_id]
+                
+                # Update queue positions for waiting models
+                await self._update_queue_positions()
+                
+                logger.info(f"Processing model: {workflow.hf_repo_id} (ID: {workflow.model_id})")
+                
+                try:
+                    # Run the workflow pipeline
+                    await workflow.run_pipeline()
+                    logger.info(f"Model {workflow.hf_repo_id} completed successfully")
+                except Exception as e:
+                    logger.error(f"Model {workflow.hf_repo_id} failed: {e}")
+                finally:
+                    self.current_workflow = None
+                    self.queue.task_done()
+                    
+                    # Broadcast queue update
+                    from websocket_manager import manager as ws_manager
+                    await ws_manager.broadcast({
+                        "type": "queue_update",
+                        "queue_size": self.queue.qsize(),
+                        "current_model": None
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Queue worker error: {e}")
+                self.current_workflow = None
+                
+    async def _update_queue_positions(self):
+        """Update database with current queue positions for waiting models."""
+        from database import get_db_connection
+        
+        position = 1
+        for item in self._queue_list:
+            try:
+                conn = await get_db_connection()
+                await conn.execute(
+                    "UPDATE models SET log = REPLACE(log, 'position ' || ?, 'position ' || ?) WHERE id = ?",
+                    (str(position + 1), str(position), item["model_id"])
+                )
+                await conn.commit()
+                await conn.close()
+                position += 1
+            except Exception:
+                pass  # Non-critical, continue
+                
+    def get_status(self):
+        """Get current queue status."""
+        return {
+            "current_model_id": self.current_workflow.model_id if self.current_workflow else None,
+            "current_hf_repo": self.current_workflow.hf_repo_id if self.current_workflow else None,
+            "waiting_count": self.queue.qsize(),
+            "queue": [
+                {
+                    "model_id": item["model_id"],
+                    "hf_repo_id": item["hf_repo_id"],
+                    "position": idx + 1
+                }
+                for idx, item in enumerate(self._queue_list)
+            ]
+        }
+        
+    async def clear(self):
+        """Clear the queue (admin function)."""
+        import logging
+        logger = logging.getLogger("GGUF_Forge")
+        
+        # Clear the queue
+        while not self.queue.empty():
+            try:
+                self.queue.get_nowait()
+                self.queue.task_done()
+            except asyncio.QueueEmpty:
+                break
+        
+        self._queue_list.clear()
+        logger.info("Queue cleared")
+
+
+def get_model_queue():
+    """Get the global model queue instance."""
+    global model_queue
+    return model_queue
+
+
+def set_model_queue(queue: ModelQueue):
+    """Set the global model queue instance."""
+    global model_queue
+    model_queue = queue
 
 
 class ModelWorkflow:

@@ -100,7 +100,7 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Llama.cpp Constants - available quant types
 QUANTS = ["Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L", "Q4_0", "Q4_K_S", "Q4_K_M", "Q5_0", "Q5_K_S", "Q5_K_M", "Q6_K", "Q8_0"]
-PARALLEL_QUANT_JOBS = int(os.getenv("PARALLEL_QUANT_JOBS", "2"))
+PARALLEL_QUANT_JOBS = int(os.getenv("PARALLEL_QUANT_JOBS", "1"))  # Default 1 for safer resource usage
 
 # Server configuration
 SERVER_HOST = os.getenv("HOST", "0.0.0.0")
@@ -119,7 +119,7 @@ OAUTH_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI", "http://localhost:8000/auth
 from database import init_db, get_db_connection, set_db_path
 from security import RateLimiter, BotDetector, SpamProtection
 from managers import set_paths as set_manager_paths
-from workflow import set_workflow_config, running_workflows
+from workflow import set_workflow_config, running_workflows, ModelQueue, set_model_queue, get_model_queue
 from websocket_manager import manager as ws_manager
 
 # Set paths for modules
@@ -181,6 +181,13 @@ async def require_admin(request: Request):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    
+    # Initialize and start the model queue worker
+    queue = ModelQueue()
+    set_model_queue(queue)
+    queue.start_worker()
+    logger.info("Model queue system initialized")
+    
     conn = await get_db_connection()
     
     # Startup cleanup: Check for stuck 'processing' jobs from crashed server

@@ -444,6 +444,7 @@
     <!-- Admin Controls Bar -->
     <div id="admin-controls"
         style="margin-bottom: 1.5rem; display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
+        <div id="queue-status" style="font-size: 0.75rem; color: var(--text-secondary);"></div>
         <div id="llama-update-status" style="font-size: 0.75rem; color: var(--text-secondary);"></div>
         <button id="update-llama-btn" onclick="updateLlamaCpp()"
             style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
@@ -1146,6 +1147,40 @@
         setTimeout(checkForAppUpdate, 1000);
         // Re-check every 5 minutes
         setInterval(checkForAppUpdate, 5 * 60 * 1000);
+        
+        // Check queue status
+        checkQueueStatus();
+        // Re-check every 10 seconds
+        setInterval(checkQueueStatus, 10 * 1000);
+    }
+
+    async function checkQueueStatus() {
+        if (!isAdmin) return;
+        
+        try {
+            const res = await fetch('/api/queue/status');
+            const data = await res.json();
+            const statusEl = document.getElementById('queue-status');
+            
+            if (!data.enabled) {
+                statusEl.textContent = '';
+                return;
+            }
+            
+            if (data.current_model) {
+                if (data.queue && data.queue.length > 0) {
+                    statusEl.innerHTML = `<span style="color: var(--text-primary);">Processing: ${data.current_model.hf_repo_id.split('/')[1] || data.current_model.hf_repo_id}</span> <span style="opacity: 0.7;">(+${data.queue.length} in queue)</span>`;
+                } else {
+                    statusEl.innerHTML = `<span style="color: var(--text-primary);">Processing: ${data.current_model.hf_repo_id.split('/')[1] || data.current_model.hf_repo_id}</span>`;
+                }
+            } else if (data.queue && data.queue.length > 0) {
+                statusEl.innerHTML = `<span style="opacity: 0.7;">Queue: ${data.queue.length} waiting</span>`;
+            } else {
+                statusEl.innerHTML = '<span style="opacity: 0.5;">Queue empty</span>';
+            }
+        } catch (e) {
+            console.error('Queue status check failed:', e);
+        }
     }
 
     async function fetchSuggestions(query) {
