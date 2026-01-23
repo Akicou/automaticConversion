@@ -562,35 +562,71 @@
     <div>
         <h2 style="font-weight: 400; font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--text-secondary);">Conversion
             Queue</h2>
+        
+        <!-- Filter Bar -->
+        <div class="filter-bar" id="filter-bar">
+            <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">
+                All <span class="count" id="count-all">0</span>
+            </div>
+            <div class="filter-chip" data-filter="processing" onclick="setFilter('processing')">
+                Processing <span class="count" id="count-processing">0</span>
+            </div>
+            <div class="filter-chip" data-filter="queued" onclick="setFilter('queued')">
+                Queued <span class="count" id="count-queued">0</span>
+            </div>
+            <div class="filter-chip" data-filter="complete" onclick="setFilter('complete')">
+                Complete <span class="count" id="count-complete">0</span>
+            </div>
+            <div class="filter-chip" data-filter="error" onclick="setFilter('error')">
+                Failed <span class="count" id="count-error">0</span>
+            </div>
+            <div class="filter-chip" data-filter="interrupted" onclick="setFilter('interrupted')">
+                Interrupted <span class="count" id="count-interrupted">0</span>
+            </div>
+        </div>
+        
         <div id="models-list" style="display: grid; gap: 1rem;">
-            <div
-                style="text-align: center; color: var(--text-secondary); padding: 2rem; border: 1px dashed var(--glass-border); border-radius: 8px;">
-                No active conversions.</div>
+            <div class="empty-state">
+                <div class="empty-state-icon">⚒️</div>
+                <div class="empty-state-text">No active conversions</div>
+                <div class="empty-state-subtext">Models will appear here once processing starts</div>
+            </div>
         </div>
     </div>
 </div>
 
 <template id="model-card-template">
-    <div class="model-card glass-panel" data-model-id="" style="padding: 1.5rem; transition: border-color 0.2s;">
+    <div class="model-card glass-panel" data-model-id="" style="padding: 1.5rem;">
         <div class="model-card-header"
-            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 class="model-name" style="margin: 0; font-size: 1rem; font-weight: 500;">Model Name</h3>
-            <div class="model-card-actions" style="display: flex; align-items: center; gap: 0.75rem;">
-                <span class="status-badge"
-                    style="font-family: monospace; letter-spacing: 0.05em; font-size: 0.75rem;">Status</span>
+            style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; gap: 1rem;">
+            <div style="flex: 1; min-width: 0;">
+                <h3 class="model-name" style="margin: 0 0 0.5rem 0; font-size: 1.05rem; font-weight: 500; word-break: break-word;">Model Name</h3>
+                <div class="model-meta" style="display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.75rem; color: var(--text-secondary);">
+                    <span class="model-id-badge" style="font-family: 'JetBrains Mono', monospace; opacity: 0.6;">ID: <span class="model-id-val"></span></span>
+                    <button class="view-quants-btn" onclick="toggleQuants(event)" style="background: none; border: 1px solid rgba(255,255,255,0.15); color: var(--text-secondary); padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem; transition: all 0.2s;">
+                        View Quants
+                    </button>
+                </div>
+            </div>
+            <div class="model-card-actions" style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                <span class="status-badge">Status</span>
                 <button class="continue-btn"
-                    style="display: none; background: var(--success); color: #000; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">Continue</button>
+                    style="display: none; background: var(--success); color: #000; border: none; padding: 0.35rem 0.65rem; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 600;">Continue</button>
                 <button class="terminate-btn"
-                    style="display: none; background: transparent; color: #ff8c00; border: 1px solid #ff8c00; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">Terminate</button>
+                    style="display: none; background: transparent; color: var(--warning); border: 1px solid var(--warning); padding: 0.35rem 0.65rem; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">Stop</button>
                 <button class="delete-btn"
-                    style="display: none; background: transparent; color: var(--error); border: 1px solid var(--error); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">Delete</button>
+                    style="display: none; background: transparent; color: var(--error); border: 1px solid var(--error); padding: 0.35rem 0.65rem; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">Delete</button>
             </div>
         </div>
+        
         <div class="progress-bar-bg"
-            style="background: rgba(255,255,255,0.05); height: 2px; width: 100%; margin-bottom: 1rem;">
+            style="background: rgba(255,255,255,0.03); height: 3px; width: 100%; margin-bottom: 1rem; border-radius: 10px; overflow: hidden;">
             <div class="progress-bar-fill"
-                style="background: var(--text-primary); height: 100%; width: 0%; transition: width 0.5s ease;"></div>
+                style="height: 100%; width: 0%;"></div>
         </div>
+        
+        <!-- Quants Viewer (Hidden by default) -->
+        <div class="quants-viewer" style="display: none;"></div>
         <!-- Transfer Progress Section (Downloads/Uploads) -->
         <div class="transfer-progress" style="display: none; margin-bottom: 1rem;">
             <div class="transfer-header"
@@ -1343,23 +1379,155 @@ async function requestModel() {
         } catch (e) { console.error(e); }
     }
 
+    function toggleQuants(event) {
+        event.stopPropagation();
+        const btn = event.target;
+        const card = btn.closest('.model-card');
+        const quantsViewer = card.querySelector('.quants-viewer');
+        
+        if (quantsViewer.style.display === 'none' || !quantsViewer.style.display) {
+            quantsViewer.style.display = 'grid';
+            btn.textContent = 'Hide Quants';
+            btn.style.background = 'rgba(255,255,255,0.1)';
+        } else {
+            quantsViewer.style.display = 'none';
+            btn.textContent = 'View Quants';
+            btn.style.background = 'none';
+        }
+    }
+
+    function renderQuants(card, model) {
+        const quantsViewer = card.querySelector('.quants-viewer');
+        if (!quantsViewer) return;
+        
+        // Get completed quants from model data
+        let completedQuants = [];
+        try {
+            if (model.completed_quants) {
+                completedQuants = JSON.parse(model.completed_quants);
+            }
+        } catch (e) {
+            console.error('Failed to parse completed_quants:', e);
+        }
+        
+        // All available quants
+        const allQuants = ["Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L", "Q4_0", "Q4_K_S", "Q4_K_M", "Q5_0", "Q5_K_S", "Q5_K_M", "Q6_K", "Q8_0"];
+        
+        // Render quant chips
+        quantsViewer.innerHTML = allQuants.map(quant => {
+            const isCompleted = completedQuants.includes(quant);
+            const className = isCompleted ? 'quant-chip completed' : 'quant-chip pending';
+            const icon = isCompleted ? '✓' : '○';
+            return `<div class="${className}">${icon} ${quant}</div>`;
+        }).join('');
+    }
+
     // Store scroll positions for each model's log panel
     const logScrollPositions = {};
 
     // Track if user is actively scrolling (to avoid auto-scroll to bottom)
     const userScrolling = {};
 
-    function renderModels(models) {
+    // Filter state
+    let currentFilter = 'all';
+    let allModelsData = [];
+
+    function setFilter(filter) {
+        currentFilter = filter;
+        
+        // Update active state
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.classList.toggle('active', chip.dataset.filter === filter);
+        });
+        
+        // Re-render with current data
+        renderModels(allModelsData, false);
+    }
+
+    function updateFilterCounts(models) {
+        const counts = {
+            all: models.length,
+            processing: 0,
+            queued: 0,
+            complete: 0,
+            error: 0,
+            interrupted: 0
+        };
+        
+        models.forEach(model => {
+            const status = model.status.toLowerCase();
+            if (['pending', 'initializing', 'downloading', 'converting', 'quantizing', 'uploading'].includes(status)) {
+                counts.processing++;
+            } else if (status === 'complete') {
+                counts.complete++;
+            } else if (status === 'error') {
+                counts.error++;
+            } else if (status === 'interrupted') {
+                counts.interrupted++;
+            }
+            
+            // Check if model is queued (in logs)
+            if (model.log && model.log.includes('In queue')) {
+                counts.queued++;
+            }
+        });
+        
+        // Update UI
+        Object.keys(counts).forEach(key => {
+            const el = document.getElementById(`count-${key}`);
+            if (el) el.textContent = counts[key];
+        });
+    }
+
+    function filterModels(models) {
+        if (currentFilter === 'all') return models;
+        
+        return models.filter(model => {
+            const status = model.status.toLowerCase();
+            
+            switch (currentFilter) {
+                case 'processing':
+                    return ['pending', 'initializing', 'downloading', 'converting', 'quantizing', 'uploading'].includes(status);
+                case 'queued':
+                    return model.log && model.log.includes('In queue');
+                case 'complete':
+                    return status === 'complete';
+                case 'error':
+                    return status === 'error';
+                case 'interrupted':
+                    return status === 'interrupted';
+                default:
+                    return true;
+            }
+        });
+    }
+
+    function renderModels(models, updateCounts = true) {
         const container = document.getElementById('models-list');
         const template = document.getElementById('model-card-template');
+        
+        // Store all models data
+        allModelsData = models || [];
+        
+        // Update filter counts
+        if (updateCounts) {
+            updateFilterCounts(allModelsData);
+        }
+        
+        // Filter models based on current filter
+        const filteredModels = filterModels(allModelsData);
 
-        if (!models || models.length === 0) {
-            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 2rem; border: 1px dashed var(--glass-border); border-radius: 8px;">No active conversions.</div>';
+        if (!filteredModels || filteredModels.length === 0) {
+            container.innerHTML = `<div class="empty-state">
+                <div class="empty-state-icon">⚒️</div>
+                <div class="empty-state-text">No models found</div>
+                <div class="empty-state-subtext">${currentFilter === 'all' ? 'Models will appear here once processing starts' : `No ${currentFilter} models at the moment`}</div>
+            </div>`;
             return;
         }
 
         // Clean up empty state message if present
-        const emptyMsg = container.querySelector('div[style*="text-align: center"]');
+        const emptyMsg = container.querySelector('.empty-state');
         if (emptyMsg) emptyMsg.remove();
 
         // 1. Mark all existing cards as stale initially
@@ -1368,8 +1536,8 @@ async function requestModel() {
             existingCards.set(card.dataset.modelId, card);
         });
 
-        // 2. Process models
-        models.forEach(model => {
+        // 2. Process filtered models
+        filteredModels.forEach(model => {
             let card = existingCards.get(model.id);
             let logsEl;
             let shouldAutoScroll = true;
@@ -1393,14 +1561,29 @@ async function requestModel() {
 
             // Update content
             card.querySelector('.model-name').textContent = model.hf_repo_id;
+            const modelIdVal = card.querySelector('.model-id-val');
+            if (modelIdVal) {
+                modelIdVal.textContent = model.id.substring(0, 8);
+                modelIdVal.title = model.id; // Full ID on hover
+            }
+            
+            // Add status class to card for styling
+            card.className = `model-card glass-panel status-${model.status.toLowerCase()}`;
+            card.dataset.modelId = model.id;
+            
+            // Render quants
+            renderQuants(card, model);
 
             const badge = card.querySelector('.status-badge');
             badge.textContent = model.status.toUpperCase();
+            badge.className = `status-badge status-${model.status.toLowerCase()}`;
 
             if (model.status === 'error') badge.style.color = 'var(--error)';
             else if (model.status === 'complete') badge.style.color = 'var(--success)';
             else if (model.status === 'terminated') badge.style.color = '#ff8c00';
             else if (model.status === 'interrupted') badge.style.color = '#fbbf24';
+            else if (['pending', 'initializing'].includes(model.status)) badge.style.color = 'var(--info)';
+            else if (['downloading', 'converting', 'quantizing', 'uploading'].includes(model.status)) badge.style.color = 'var(--warning)';
             else badge.style.color = ''; // Default color
 
             // Progress
