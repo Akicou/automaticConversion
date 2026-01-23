@@ -444,6 +444,12 @@
     <!-- Admin Controls Bar -->
     <div id="admin-controls"
         style="margin-bottom: 1.5rem; display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
+        <div id="llama-update-status" style="font-size: 0.75rem; color: var(--text-secondary);"></div>
+        <button id="update-llama-btn" onclick="updateLlamaCpp()"
+            style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
+            <span id="llama-btn-icon">🔧</span>
+            <span id="llama-btn-text">Update llama.cpp</span>
+        </button>
         <div id="update-status" style="font-size: 0.75rem; color: var(--text-secondary);"></div>
         <button id="update-app-btn" onclick="performAppUpdate()" disabled
             style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: not-allowed; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; opacity: 0.5;">
@@ -1055,6 +1061,84 @@
         };
 
         poll();
+    }
+
+    async function updateLlamaCpp() {
+        if (!isAdmin) return;
+
+        const btn = document.getElementById('update-llama-btn');
+        const btnText = document.getElementById('llama-btn-text');
+        const btnIcon = document.getElementById('llama-btn-icon');
+        const statusEl = document.getElementById('llama-update-status');
+
+        if (!confirm('Force update llama.cpp to latest commit?\n\nThis will:\n• Fetch all updates from GitHub\n• Discard any local changes\n• Reset to latest remote commit\n\nNote: This does NOT rebuild automatically.')) {
+            return;
+        }
+
+        btn.disabled = true;
+        btn.style.cursor = 'wait';
+        btn.style.opacity = '0.5';
+        btnIcon.textContent = '⏳';
+        btnText.textContent = 'Updating...';
+        statusEl.textContent = 'Fetching latest llama.cpp...';
+
+        try {
+            const res = await fetch('/api/llama-cpp/update?force=true&rebuild=false', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+
+            if (res.ok && data.status === 'success') {
+                btnIcon.textContent = '✓';
+                btnText.textContent = 'Update complete';
+                const commitInfo = data.commit;
+                if (commitInfo && commitInfo.hash) {
+                    statusEl.innerHTML = `<span style="color: var(--success);">Updated to ${commitInfo.hash}: ${commitInfo.message}</span>`;
+                } else {
+                    statusEl.innerHTML = '<span style="color: var(--success);">llama.cpp updated successfully</span>';
+                }
+                
+                // Reset button after 3 seconds
+                setTimeout(() => {
+                    btnIcon.textContent = '🔧';
+                    btnText.textContent = 'Update llama.cpp';
+                    btn.disabled = false;
+                    btn.style.cursor = 'pointer';
+                    btn.style.opacity = '1';
+                    statusEl.textContent = '';
+                }, 3000);
+            } else {
+                btnIcon.textContent = '❌';
+                btnText.textContent = 'Update failed';
+                statusEl.innerHTML = `<span style="color: var(--error);">${data.detail || 'Update failed'}</span>`;
+                btn.disabled = false;
+                btn.style.cursor = 'pointer';
+                btn.style.opacity = '1';
+                
+                // Reset after 5 seconds
+                setTimeout(() => {
+                    btnIcon.textContent = '🔧';
+                    btnText.textContent = 'Update llama.cpp';
+                    statusEl.textContent = '';
+                }, 5000);
+            }
+        } catch (e) {
+            console.error('llama.cpp update failed:', e);
+            btnIcon.textContent = '❌';
+            btnText.textContent = 'Update failed';
+            statusEl.innerHTML = `<span style="color: var(--error);">Network error: ${e.message}</span>`;
+            btn.disabled = false;
+            btn.style.cursor = 'pointer';
+            btn.style.opacity = '1';
+            
+            // Reset after 5 seconds
+            setTimeout(() => {
+                btnIcon.textContent = '🔧';
+                btnText.textContent = 'Update llama.cpp';
+                statusEl.textContent = '';
+            }, 5000);
+        }
     }
 
 // Check for updates on page load (admin only)

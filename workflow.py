@@ -46,7 +46,7 @@ def get_quants_list():
 class ModelWorkflow:
     def __init__(self, model_id: str, hf_repo_id: str, resume_mode: bool = False, 
                  completed_quants: Optional[List[str]] = None, quants_to_run: Optional[List[str]] = None,
-                 ignore_space_check: bool = False):
+                 ignore_space_check: bool = False, force_llama_update: bool = False):
         self.model_id = model_id
         self.hf_repo_id = hf_repo_id
         self.log_buffer = []
@@ -73,6 +73,8 @@ class ModelWorkflow:
         self.api = None
         # Admin override - skip conservative disk space checks
         self.ignore_space_check = ignore_space_check
+        # Force llama.cpp update flag
+        self.force_llama_update = force_llama_update
     
     async def terminate(self):
         """Request termination of this workflow."""
@@ -290,7 +292,9 @@ class ModelWorkflow:
             self.start_step("setup")
             await self.log("▶ STEP 1: Setting up llama.cpp...")
             await self.log("  Checking llama.cpp installation...")
-            await LlamaCppManager.clone_repo()
+            if self.force_llama_update:
+                await self.log("  Force update enabled - will fetch latest llama.cpp commit...")
+            await LlamaCppManager.clone_repo(force=self.force_llama_update)
             self.check_terminated()
             await self.log("  Building llama.cpp (this may take a while)...")
             await LlamaCppManager.build()

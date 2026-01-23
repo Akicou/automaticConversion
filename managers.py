@@ -55,16 +55,83 @@ class LlamaCppManager:
             return False
     
     @staticmethod
-    async def clone_repo():
+    async def clone_repo(force: bool = False):
+        """Clone or update llama.cpp repository.
+        
+        Args:
+            force: If True, forcefully fetch and reset to latest remote commit,
+                   discarding any local changes. If False, perform normal git pull.
+        """
         if LlamaCppManager.is_installed():
-            logger.info("llama.cpp already exists. Pulling latest...")
-            proc = await asyncio.create_subprocess_exec(
-                "git", "pull",
-                cwd=LLAMA_CPP_DIR,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await proc.wait()
+            if force:
+                logger.info("llama.cpp already exists. Forcefully updating to latest commit...")
+                
+                # Step 1: Fetch all updates from origin
+                logger.info("Fetching all updates from origin...")
+                proc = await asyncio.create_subprocess_exec(
+                    "git", "fetch", "--all",
+                    cwd=LLAMA_CPP_DIR,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                if proc.returncode != 0:
+                    error_msg = stderr.decode() if stderr else "Unknown error"
+                    logger.error(f"Failed to fetch updates: {error_msg}")
+                    raise Exception(f"Failed to fetch llama.cpp updates: {error_msg}")
+                
+                # Step 2: Get current branch name
+                proc = await asyncio.create_subprocess_exec(
+                    "git", "rev-parse", "--abbrev-ref", "HEAD",
+                    cwd=LLAMA_CPP_DIR,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                if proc.returncode != 0:
+                    # Fallback to master/main if branch detection fails
+                    branch = "master"
+                    logger.warning(f"Could not detect branch, defaulting to {branch}")
+                else:
+                    branch = stdout.decode().strip()
+                    logger.info(f"Current branch: {branch}")
+                
+                # Step 3: Hard reset to origin branch
+                logger.info(f"Resetting to origin/{branch} (discarding local changes)...")
+                proc = await asyncio.create_subprocess_exec(
+                    "git", "reset", "--hard", f"origin/{branch}",
+                    cwd=LLAMA_CPP_DIR,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                if proc.returncode != 0:
+                    error_msg = stderr.decode() if stderr else "Unknown error"
+                    logger.error(f"Failed to reset to origin/{branch}: {error_msg}")
+                    raise Exception(f"Failed to reset llama.cpp: {error_msg}")
+                
+                # Step 4: Get current commit info
+                proc = await asyncio.create_subprocess_exec(
+                    "git", "log", "-1", "--oneline",
+                    cwd=LLAMA_CPP_DIR,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                if proc.returncode == 0:
+                    commit_info = stdout.decode().strip()
+                    logger.info(f"Updated to: {commit_info}")
+                else:
+                    logger.info("Force update complete")
+            else:
+                logger.info("llama.cpp already exists. Pulling latest...")
+                proc = await asyncio.create_subprocess_exec(
+                    "git", "pull",
+                    cwd=LLAMA_CPP_DIR,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                await proc.wait()
         else:
             logger.info("Cloning llama.cpp...")
             proc = await asyncio.create_subprocess_exec(

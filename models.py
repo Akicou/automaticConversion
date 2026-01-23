@@ -13,6 +13,7 @@ class LoginRequest(BaseModel):
 class ProcessRequest(BaseModel):
     model_id: str
     quants: Optional[List[str]] = None  # If None, uses all quants
+    force_llama_update: Optional[bool] = False  # If True, forcefully update llama.cpp to latest commit
 
 
 class ModelRequestSubmit(BaseModel):

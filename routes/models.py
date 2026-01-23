@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from database import get_db_connection
 from models import ProcessRequest
 from workflow import ModelWorkflow, running_workflows, get_quants_list
-from managers import HuggingFaceManager
+from managers import HuggingFaceManager, LlamaCppManager
 
 router = APIRouter(prefix="/api")
 
@@ -134,7 +134,12 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
     await conn.commit()
     await conn.close()
     
-    workflow = ModelWorkflow(new_id, req.model_id, quants_to_run=quants_to_run)
+    workflow = ModelWorkflow(
+        new_id, 
+        req.model_id, 
+        quants_to_run=quants_to_run,
+        force_llama_update=req.force_llama_update if hasattr(req, 'force_llama_update') else False
+    )
     background_tasks.add_task(workflow.run_pipeline)
     
     return {"status": "started", "id": new_id, "quants": quants_to_run}
@@ -263,3 +268,64 @@ async def continue_model(model_id: str, background_tasks: BackgroundTasks, user 
         "completed": completed_quants,
         "remaining": remaining_quants
     }
+
+
+@router.post("/llama-cpp/update")
+async def force_update_llama_cpp(force: bool = False, rebuild: bool = False, user = Depends(get_admin)):
+    """Admin only: Update llama.cpp repository to latest commit.
+    
+    Args:
+        force: If True, forcefully reset to latest remote commit (discards local changes).
+               If False, perform normal git pull.
+        rebuild: If True, rebuild llama.cpp after updating.
+    
+    Returns:
+        Status of the update operation including current commit hash.
+    """
+    try:
+        # Update the repository
+        await LlamaCppManager.clone_repo(force=force)
+        
+        # Get current commit info
+        import asyncio
+        from managers import LLAMA_CPP_DIR
+        
+        proc = await asyncio.create_subprocess_exec(
+            "git", "log", "-1", "--format=%H|%s|%an|%ar",
+            cwd=LLAMA_CPP_DIR,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        
+        commit_info = {}
+        if proc.returncode == 0:
+            parts = stdout.decode().strip().split('|')
+            if len(parts) >= 4:
+                commit_info = {
+                    "hash": parts[0][:8],  # Short hash
+                    "message": parts[1],
+                    "author": parts[2],
+                    "date": parts[3]
+                }
+        
+        # Optionally rebuild
+        rebuild_status = "not_requested"
+        if rebuild:
+            rebuild_status = "building"
+            await LlamaCppManager.build()
+            rebuild_status = "complete"
+        
+        return {
+            "status": "success",
+            "update_type": "force_reset" if force else "pull",
+            "commit": commit_info,
+            "rebuild": rebuild_status,
+            "message": f"llama.cpp successfully {'force updated' if force else 'updated'}"
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to update llama.cpp: {str(e)}"
+        )
