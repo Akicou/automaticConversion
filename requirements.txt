@@ -10,7 +10,7 @@ aiofiles
 python-multipart
 transformers
 sentencepiece
-hf_xet
+hf-xet
 hf_transfer
 cmake
 passlib
