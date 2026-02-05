@@ -4,10 +4,11 @@ Model conversion workflow for GGUF Forge.
 import os
 import sys
 import json
+import re
 import shutil
 import asyncio
 import traceback
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
 
@@ -311,6 +312,176 @@ class ModelWorkflow:
                 self.model_dir = None
             except Exception as e:
                 await self.log(f"  ⚠ Failed to cleanup safetensors: {e}")
+
+    def _get_gguf_shards(self, base_path: Path) -> List[Tuple[int, int, Path]]:
+        """Find sharded GGUF files matching a base output path."""
+        stem = base_path.stem
+        if not stem:
+            return []
+        
+        pattern = re.compile(rf"^{re.escape(stem)}-(\d{{5}})-of-(\d{{5}})\.gguf$")
+        shard_sets = {}
+        
+        for file_path in base_path.parent.glob(f"{stem}-?????-of-?????.gguf"):
+            match = pattern.match(file_path.name)
+            if not match:
+                continue
+            idx = int(match.group(1))
+            total = int(match.group(2))
+            shard_sets.setdefault(total, []).append((idx, file_path))
+        
+        if not shard_sets:
+            return []
+        
+        # Prefer the shard set with the most parts (handles stale leftovers).
+        total = max(shard_sets.keys(), key=lambda t: len(shard_sets[t]))
+        shards = shard_sets[total]
+        shards.sort(key=lambda s: s[0])
+        return [(idx, total, path) for idx, path in shards]
+    
+    async def _cleanup_gguf_shards(self, shard_paths: List[Path], q_type: str):
+        """Delete shard files after successful merge."""
+        loop = asyncio.get_event_loop()
+        for shard_path in shard_paths:
+            try:
+                await loop.run_in_executor(None, lambda p=shard_path: p.unlink(missing_ok=True))
+            except Exception as e:
+                await self.log(f"      ⚠ {q_type} Failed to delete shard {shard_path.name}: {e}")
+    
+    async def ensure_unsharded_gguf(self, q_path: Path, q_type: str) -> Optional[Path]:
+        """Merge sharded GGUF output into a single file when needed."""
+        shards = self._get_gguf_shards(q_path)
+        if not shards:
+            if q_path.exists():
+                return q_path
+            await self.log(f"      ⚠ {q_type} Output file missing: {q_path.name}")
+            return None
+        
+        total = shards[0][1]
+        shard_paths = [path for _, _, path in shards]
+        shard_indices = {idx for idx, _, _ in shards}
+        missing = [i for i in range(1, total + 1) if i not in shard_indices]
+        
+        if missing:
+            preview = ", ".join(f"{i:05d}" for i in missing[:5])
+            suffix = "..." if len(missing) > 5 else ""
+            await self.log(f"      ⚠ {q_type} Shard set incomplete (missing {preview}{suffix})")
+            return None
+        
+        if q_path.exists():
+            try:
+                base_mtime = q_path.stat().st_mtime
+                latest_shard_mtime = max(p.stat().st_mtime for p in shard_paths)
+                if latest_shard_mtime < base_mtime:
+                    await self.log(f"      ℹ {q_type} Shards are older than merged output - skipping merge")
+                    return q_path
+            except Exception:
+                pass
+        
+        await self.log(f"      ℹ {q_type} Output is sharded ({total} parts). Merging...")
+        
+        try:
+            gguf_split_bin = LlamaCppManager.get_gguf_split_path()
+        except FileNotFoundError as e:
+            await self.log(f"      ⚠ {q_type} Merge tool not found: {e}")
+            return None
+        
+        merge_output = q_path
+        if merge_output.exists():
+            merge_output = q_path.with_suffix(".merged.gguf")
+        if merge_output.exists():
+            try:
+                merge_output.unlink(missing_ok=True)
+            except Exception:
+                pass
+        
+        process = await asyncio.create_subprocess_exec(
+            str(gguf_split_bin), "--merge", str(shard_paths[0]), str(merge_output),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        self.running_processes.append(process)
+        stdout, stderr = await process.communicate()
+        try:
+            self.running_processes.remove(process)
+        except ValueError:
+            pass
+        
+        if process.returncode != 0:
+            error_output = (stderr.decode().strip() or stdout.decode().strip() or "Unknown error")
+            await self.log(f"      ⚠ {q_type} Shard merge failed: {error_output[:200]}")
+            return None
+        
+        if merge_output != q_path:
+            try:
+                q_path.unlink(missing_ok=True)
+            except Exception as e:
+                await self.log(f"      ⚠ {q_type} Failed to remove old output: {e}")
+                return None
+            try:
+                merge_output.replace(q_path)
+            except Exception as e:
+                await self.log(f"      ⚠ {q_type} Failed to finalize merged file: {e}")
+                return None
+        
+        await self.log(f"      ✓ {q_type} Shards merged into {q_path.name}")
+        await self._cleanup_gguf_shards(shard_paths, q_type)
+        return q_path
+
+    async def upload_status_readme(self, quant_base_name: str, uploaded_files: List[str]):
+        """Upload a temporary README with current conversion status."""
+        if not (self.hf_token and self.new_repo_id and self.api):
+            return
+        
+        try:
+            app_version = await get_app_version()
+            updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            completed_display = ", ".join(uploaded_files) if uploaded_files else "None yet"
+            remaining = [q for q in self.quants_to_run if q not in uploaded_files]
+            remaining_display = ", ".join(remaining) if remaining else "None"
+            progress = f"{len(uploaded_files)}/{len(self.quants_to_run)}"
+            
+            readme_content = f"""---
+tags:
+- gguf
+- llama.cpp
+- quantization
+base_model: {self.hf_repo_id}
+---
+
+# {quant_base_name}-GGUF
+
+This repository is being generated by GGUF Forge and will update as quants finish.
+
+## Status
+- Job ID: `{self.model_id}`
+- Stage: Quantizing
+- Updated: {updated_at}
+- Progress: {progress}
+- Completed quants: {completed_display}
+- Remaining quants: {remaining_display}
+
+## Ollama Support
+Full Ollama support is provided by merging any sharded GGUF output into a single file after quantization.
+
+---
+*This README is temporary and will be replaced when conversion completes.*
+*Converted automatically by [GGUF Forge](https://gguforge.com) {app_version}*
+
+"""
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                lambda: self.api.upload_file(
+                    path_or_fileobj=readme_content.encode('utf-8'),
+                    path_in_repo="README.md",
+                    repo_id=self.new_repo_id,
+                    repo_type="model"
+                )
+            )
+            await self.log("  ✓ Status README uploaded")
+        except Exception as e:
+            await self.log(f"  ⚠ Status README upload failed: {e}")
 
     def start_step(self, step_name: str):
         """Start timing a step."""
@@ -646,6 +817,9 @@ class ModelWorkflow:
                 await self.log(f"  📋 Custom quants requested: {', '.join(self.quants_to_run)}")
                 await self.log("")
             
+            if self.hf_token and self.new_repo_id:
+                await self.upload_status_readme(quant_base_name, uploaded_files)
+            
             total_quants = len(self.quants_to_run)
             completed_count = len(self.completed_quants)
             
@@ -705,6 +879,12 @@ class ModelWorkflow:
                         
                         self.quant_times.append((q_type, quant_duration))
                         await self.log(f"      ✓ {q_type} Quantized ({self.format_duration(quant_duration)})")
+                        
+                        # Ensure output is a single GGUF file (merge shards if needed)
+                        merged_path = await self.ensure_unsharded_gguf(q_path, q_type)
+                        if not merged_path:
+                            return
+                        q_path = merged_path
                         
                         # === UPLOAD ===
                         if self.hf_token and self.new_repo_id:
@@ -819,6 +999,9 @@ This model was converted to GGUF format from [`{self.hf_repo_id}`](https://huggi
 ## Quants
 The following quants are available:
 {', '.join(uploaded_files)}
+
+## Ollama Support
+Full Ollama support is provided by merging any sharded GGUF output into a single file after quantization.
 
 ## Conversion Stats
 

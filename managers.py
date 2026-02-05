@@ -286,6 +286,54 @@ class LlamaCppManager:
             f"Searched in: {LLAMA_CPP_DIR}"
         )
 
+    @staticmethod
+    def get_gguf_split_path() -> Path:
+        """Find the llama-gguf-split executable."""
+        system = platform.system()
+        build_dir = LLAMA_CPP_DIR / "build"
+        
+        if system == "Windows":
+            candidates = [
+                build_dir / "bin" / "Release" / "llama-gguf-split.exe",
+                build_dir / "Release" / "llama-gguf-split.exe",
+                build_dir / "bin" / "llama-gguf-split.exe",
+                build_dir / "llama-gguf-split.exe",
+                build_dir / "bin" / "Release" / "gguf-split.exe",
+                build_dir / "Release" / "gguf-split.exe",
+                build_dir / "bin" / "gguf-split.exe",
+                build_dir / "gguf-split.exe",
+            ]
+        else:
+            candidates = [
+                build_dir / "bin" / "llama-gguf-split",
+                build_dir / "llama-gguf-split",
+                LLAMA_CPP_DIR / "llama-gguf-split",
+                build_dir / "bin" / "gguf-split",
+                build_dir / "gguf-split",
+                LLAMA_CPP_DIR / "gguf-split",
+            ]
+        
+        for path in candidates:
+            if path.exists():
+                logger.info(f"Found llama-gguf-split at: {path}")
+                return path
+        
+        patterns = ["llama-gguf-split.exe", "gguf-split.exe"] if system == "Windows" else ["llama-gguf-split", "gguf-split"]
+        for pattern in patterns:
+            found = list(LLAMA_CPP_DIR.rglob(pattern))
+            if found:
+                for f in found:
+                    if "build" in str(f):
+                        logger.info(f"Found llama-gguf-split at: {f}")
+                        return f
+                logger.info(f"Found llama-gguf-split at: {found[0]}")
+                return found[0]
+        
+        raise FileNotFoundError(
+            "llama-gguf-split executable not found. Build might have failed.\n"
+            f"Searched in: {LLAMA_CPP_DIR}"
+        )
+
 
 class HuggingFaceManager:
     def __init__(self, token: Optional[str] = None):
