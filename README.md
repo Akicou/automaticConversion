@@ -480,6 +480,36 @@ Each conversion tracks:
 - Check firewall rules for the MSSQL port
 - Test connection with: `curl http://localhost:8000/api/health`
 
+### App Crashes or Conversion Failures
+
+**High Parallel Quant Jobs**
+If you set `PARALLEL_QUANT_JOBS` too high, the application may crash or conversions may fail due to resource exhaustion.
+
+**Symptoms:**
+- Application shuts down unexpectedly during quantization
+- Conversions fail with "out of memory" or "killed" errors
+- System becomes unresponsive during conversion
+
+**Solution:**
+Set `PARALLEL_QUANT_JOBS=1` or `PARALLEL_QUANT_JOBS=2` in your `.env` file:
+```env
+# Recommended: 1-2 parallel jobs for stable operation
+PARALLEL_QUANT_JOBS=2
+```
+
+**Guidelines:**
+- **1 job**: Safest option, uses all CPU cores for a single quantization
+- **2 jobs**: Balanced option, splits CPU cores between 2 parallel quantizations
+- **4+ jobs**: Only use on high-memory systems (32GB+ RAM) with many CPU cores (16+)
+
+Each parallel job consumes significant memory for the model and quantization process. Too many parallel jobs can exceed available RAM and cause the application to be terminated by the operating system.
+
+**Debugging Tips:**
+- Check browser console (F12) for JavaScript errors - logs now show detailed conversion progress
+- Check server logs for Python errors during conversion
+- Monitor system resources: RAM usage, CPU load, disk space during conversion
+- Try with `PARALLEL_QUANT_JOBS=1` to isolate issues
+
 ## Admin Features
 
 ### App Updates

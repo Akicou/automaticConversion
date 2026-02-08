@@ -1266,7 +1266,18 @@ async function convertModel() {
         // Collect selected quants (empty array means "all quants")
         const selectedQuants = getSelectedQuants();
 
+        // Show loading state to prevent double-submit
+        const submitBtn = document.querySelector('button[onclick="convertModel()"]');
+        const originalBtnText = submitBtn ? submitBtn.textContent : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Starting...';
+        }
+
         try {
+            console.log('[convertModel] Starting conversion for:', modelId);
+            console.log('[convertModel] Selected quants:', selectedQuants);
+
             const res = await fetch('/api/models/process', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1275,21 +1286,63 @@ async function convertModel() {
                     quants: selectedQuants.length > 0 ? selectedQuants : null
                 })
             });
+
+            console.log('[convertModel] Response status:', res.status, res.statusText);
+            console.log('[convertModel] Response ok:', res.ok);
+
             if (res.ok) {
                 const data = await res.json();
-                searchInput.value = '';
-                showValidation('none', '');
-                // Reset quant selector
-                selectNoQuants();
-                document.getElementById('quant-selector').style.display = 'none';
-                document.getElementById('quant-toggle-icon').textContent = '▶';
+                console.log('[convertModel] Success response:', data);
+
+                // Show success message before clearing
+                showValidation('success', `✓ Conversion started! Model ID: ${data.id}`);
+
+                // Clear form after short delay to show success message
+                setTimeout(() => {
+                    searchInput.value = '';
+                    showValidation('none', '');
+                    // Reset quant selector
+                    selectNoQuants();
+                    const quantSelector = document.getElementById('quant-selector');
+                    if (quantSelector) quantSelector.style.display = 'none';
+                    const toggleIcon = document.getElementById('quant-toggle-icon');
+                    if (toggleIcon) toggleIcon.textContent = '▶';
+                }, 2000);
+
                 fetchStatus();
             } else {
                 const err = await res.json();
-                showValidation('error', err.detail || 'Failed to start conversion');
+                console.error('[convertModel] Error response:', err);
+
+                // Show detailed error message with status code
+                const errorMsg = err.detail || err.message || `Server error (${res.status}: ${res.statusText})`;
+                showValidation('error', `Failed (${res.status}): ${errorMsg}`);
+
+                // Auto-clear error after 8 seconds
+                setTimeout(() => {
+                    const validationMsg = document.getElementById('validation-message');
+                    if (validationMsg && validationMsg.classList.contains('error')) {
+                        showValidation('none', '');
+                    }
+                }, 8000);
             }
         } catch (e) {
-            showValidation('error', 'Failed to start conversion');
+            console.error('[convertModel] Exception caught:', e);
+            showValidation('error', `Network error: ${e.message}`);
+
+            // Auto-clear error after 8 seconds
+            setTimeout(() => {
+                const validationMsg = document.getElementById('validation-message');
+                if (validationMsg && validationMsg.classList.contains('error')) {
+                    showValidation('none', '');
+                }
+            }, 8000);
+        } finally {
+            // Re-enable button
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+            }
         }
     }
 
@@ -1310,7 +1363,18 @@ async function requestModel() {
         // Collect selected quants (empty array means "all quants")
         const selectedQuants = getSelectedQuants();
 
+        // Show loading state to prevent double-submit
+        const submitBtn = document.querySelector('button[onclick="requestModel()"]');
+        const originalBtnText = submitBtn ? submitBtn.textContent : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+        }
+
         try {
+            console.log('[requestModel] Submitting request for:', modelId);
+            console.log('[requestModel] Selected quants:', selectedQuants);
+
             const res = await fetch('/api/requests/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1319,21 +1383,58 @@ async function requestModel() {
                     requested_quants: selectedQuants.length > 0 ? selectedQuants : null
                 })
             });
+
+            console.log('[requestModel] Response status:', res.status, res.statusText);
+            console.log('[requestModel] Response ok:', res.ok);
+
             const data = await res.json();
 
             if (res.ok) {
+                console.log('[requestModel] Success response:', data);
+
+                // Show success message
+                showValidation('success', '✓ Request submitted successfully!');
                 alert(data.message);
+
+                // Clear form after alert
                 searchInput.value = '';
                 showValidation('none', '');
                 // Reset quant selector
                 selectNoQuants();
-                document.getElementById('quant-selector').style.display = 'none';
-                document.getElementById('quant-toggle-icon').textContent = '▶';
+                const quantSelector = document.getElementById('quant-selector');
+                if (quantSelector) quantSelector.style.display = 'none';
+                const toggleIcon = document.getElementById('quant-toggle-icon');
+                if (toggleIcon) toggleIcon.textContent = '▶';
             } else {
-                showValidation('error', data.detail || data.message || 'Failed to submit request');
+                console.error('[requestModel] Error response:', data);
+                const errorMsg = data.detail || data.message || `Server error (${res.status})`;
+                showValidation('error', `Failed (${res.status}): ${errorMsg}`);
+
+                // Auto-clear error after 8 seconds
+                setTimeout(() => {
+                    const validationMsg = document.getElementById('validation-message');
+                    if (validationMsg && validationMsg.classList.contains('error')) {
+                        showValidation('none', '');
+                    }
+                }, 8000);
             }
         } catch (e) {
-            showValidation('error', 'Failed to submit request');
+            console.error('[requestModel] Exception caught:', e);
+            showValidation('error', `Network error: ${e.message}`);
+
+            // Auto-clear error after 8 seconds
+            setTimeout(() => {
+                const validationMsg = document.getElementById('validation-message');
+                if (validationMsg && validationMsg.classList.contains('error')) {
+                    showValidation('none', '');
+                }
+            }, 8000);
+        } finally {
+            // Re-enable button
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+            }
         }
     }
 
