@@ -8,7 +8,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <title>{% block title %}GGUF Forge{% endblock %}</title>
+    <link rel="icon" href="/static/favicon.png" type="image/png">
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/toast.css">
+    <link rel="stylesheet" href="/static/css/theme.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;700&display=swap"
         rel="stylesheet">
@@ -27,6 +30,10 @@
 
                 <div class="nav-links">
                     <a href="/" class="nav-item {{ 'active' if request.url.path == '/' else '' }}">Dashboard</a>
+                    {% if user %}
+                    <a href="/settings" class="nav-item {{ 'active' if request.url.path == '/settings' else '' }}">Settings</a>
+                    {% endif %}
+                    <button id="theme-toggle" class="nav-btn theme-btn" onclick="toggleTheme()" aria-label="Toggle theme">☀️</button>
                     {% if user %}
                     {% if role != 'admin' %}
                     <a href="/#my-requests-list"
@@ -66,6 +73,10 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/js/toast.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/keyboard.js"></script>
+    <script src="/static/js/mobile-nav.js"></script>
     {% block scripts %}{% endblock %}
 </body>
 

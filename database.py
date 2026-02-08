@@ -636,7 +636,18 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
             FOREIGN KEY (ticket_id) REFERENCES tickets(id)
         )
     ''')
-    
+
+    # User preferences table
+    await conn.execute('''
+        CREATE TABLE IF NOT EXISTS user_preferences (
+            hf_username TEXT PRIMARY KEY,
+            default_quants TEXT DEFAULT '',
+            theme TEXT DEFAULT 'dark',
+            notifications_enabled INTEGER DEFAULT 1,
+            auto_refresh_interval INTEGER DEFAULT 30
+        )
+    ''')
+
     # Performance indexes for frequently queried columns
     await conn.execute('CREATE INDEX IF NOT EXISTS idx_models_status ON models(status)')
     await conn.execute('CREATE INDEX IF NOT EXISTS idx_models_hf_repo_id ON models(hf_repo_id)')
@@ -792,7 +803,20 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
         )
     ''')
     await conn.commit()
-    
+
+    # User preferences table
+    await conn.execute('''
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='user_preferences' AND xtype='U')
+        CREATE TABLE user_preferences (
+            hf_username NVARCHAR(255) PRIMARY KEY,
+            default_quants NVARCHAR(MAX) DEFAULT '',
+            theme NVARCHAR(20) DEFAULT 'dark',
+            notifications_enabled BIT DEFAULT 1,
+            auto_refresh_interval INT DEFAULT 30
+        )
+    ''')
+    await conn.commit()
+
     # Performance indexes for frequently queried columns
     index_queries = [
         "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_models_status') CREATE INDEX idx_models_status ON models(status)",

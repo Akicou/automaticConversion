@@ -1394,9 +1394,9 @@ async function requestModel() {
 
                 // Show success message
                 showValidation('success', '✓ Request submitted successfully!');
-                alert(data.message);
+                showToast('success', data.message);
 
-                // Clear form after alert
+                // Clear form after toast
                 searchInput.value = '';
                 showValidation('none', '');
                 // Reset quant selector
@@ -1756,10 +1756,10 @@ async function requestModel() {
                 fetchStatus();
             } else {
                 const err = await res.json();
-                alert('Failed to delete: ' + err.detail);
+                showToast('error', 'Failed to delete: ' + err.detail);
             }
         } catch (e) {
-            alert('Failed to delete model');
+            showToast('error', 'Failed to delete model');
         }
     }
 
@@ -1770,13 +1770,13 @@ async function requestModel() {
             const res = await fetch(`/api/models/${modelId}/terminate`, { method: 'POST' });
             const data = await res.json();
             if (res.ok) {
-                alert(data.message || 'Termination signal sent.');
+                showToast('success', data.message || 'Termination signal sent.');
                 fetchStatus();
             } else {
-                alert('Failed to terminate: ' + (data.detail || 'Unknown error'));
+                showToast('error', 'Failed to terminate: ' + (data.detail || 'Unknown error'));
             }
         } catch (e) {
-            alert('Failed to terminate model');
+            showToast('error', 'Failed to terminate model');
         }
     }
 
@@ -1787,13 +1787,13 @@ async function requestModel() {
             const res = await fetch(`/api/models/${modelId}/continue`, { method: 'POST' });
             const data = await res.json();
             if (res.ok) {
-                alert(data.message || 'Job resumed.');
+                showToast('success', data.message || 'Job resumed.');
                 fetchStatus();
             } else {
-                alert('Failed to continue: ' + (data.detail || 'Unknown error'));
+                showToast('error', 'Failed to continue: ' + (data.detail || 'Unknown error'));
             }
         } catch (e) {
-            alert('Failed to continue model');
+            showToast('error', 'Failed to continue model');
         }
     }
 
@@ -1938,7 +1938,7 @@ async function requestModel() {
                 const ignoreSpaceCheck = cardEl.querySelector('.ignore-space-check').checked;
 
                 if (approvedQuants.length === 0) {
-                    alert('Please select at least one quant type to generate.');
+                    showToast('warning', 'Please select at least one quant type to generate.');
                     return;
                 }
 
@@ -1977,14 +1977,14 @@ async function requestModel() {
                     });
                     const data = await res.json();
                     if (res.ok) {
-                        alert(`Discussion thread created! Ticket #${data.ticket_id}`);
+                        showToast('success', `Discussion thread created! Ticket #${data.ticket_id}`);
                         fetchRequests();
                         fetchTickets();
                     } else {
-                        alert('Failed to create discussion: ' + (data.detail || 'Unknown error'));
+                        showToast('error', 'Failed to create discussion: ' + (data.detail || 'Unknown error'));
                     }
                 } catch (e) {
-                    alert('Failed to create discussion thread');
+                    showToast('error', 'Failed to create discussion thread');
                 }
             };
 
@@ -2010,7 +2010,13 @@ async function requestModel() {
         try {
             const res = await fetch('/api/tickets/all');
             if (!res.ok) {
-                container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No active discussions.</div>';
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <h3>Failed to load discussions</h3>
+                        <p>There was an error loading the discussions. Please refresh the page.</p>
+                    </div>
+                `;
                 return;
             }
             const tickets = await res.json();
@@ -2018,7 +2024,13 @@ async function requestModel() {
             renderTickets(tickets);
         } catch (e) {
             console.error(e);
-            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No active discussions.</div>';
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">⚠️</div>
+                    <h3>Failed to load discussions</h3>
+                    <p>There was an error loading the discussions. Please refresh the page.</p>
+                </div>
+            `;
         }
     }
 
@@ -2031,7 +2043,13 @@ async function requestModel() {
         container.innerHTML = '';
 
         if (tickets.length === 0) {
-            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No active discussions.</div>';
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">💬</div>
+                    <h3>No active discussions</h3>
+                    <p>When users request models, you can discuss the details here before approving.</p>
+                </div>
+            `;
             return;
         }
 
@@ -2069,10 +2087,10 @@ async function requestModel() {
                         fetchStatus();
                     } else {
                         const data = await res.json();
-                        alert('Failed to approve: ' + (data.detail || 'Unknown error'));
+                        showToast('error', 'Failed to approve: ' + (data.detail || 'Unknown error'));
                     }
                 } catch (e) {
-                    alert('Failed to approve');
+                    showToast('error', 'Failed to approve');
                 }
             };
 
@@ -2083,7 +2101,7 @@ async function requestModel() {
                     await fetch(`/api/tickets/${ticket.id}/close`, { method: 'POST' });
                     fetchTickets();
                 } catch (e) {
-                    alert('Failed to close ticket');
+                    showToast('error', 'Failed to close ticket');
                 }
             };
 
@@ -2102,14 +2120,26 @@ async function requestModel() {
         try {
             const res = await fetch('/api/requests/my');
             if (!res.ok) {
-                container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No requests yet.</div>';
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <h3>Failed to load requests</h3>
+                        <p>There was an error loading your requests. Please refresh the page.</p>
+                    </div>
+                `;
                 return;
             }
             const requests = await res.json();
             renderMyRequests(requests);
         } catch (e) {
             console.error(e);
-            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No requests yet.</div>';
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">⚠️</div>
+                    <h3>Failed to load requests</h3>
+                    <p>There was an error loading your requests. Please refresh the page.</p>
+                </div>
+            `;
         }
     }
 
@@ -2122,7 +2152,13 @@ async function requestModel() {
         container.innerHTML = '';
 
         if (requests.length === 0) {
-            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No requests yet.</div>';
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📋</div>
+                    <h3>No requests yet</h3>
+                    <p>You haven't submitted any conversion requests yet. Use the search box above to request a model.</p>
+                </div>
+            `;
             return;
         }
 
@@ -2173,7 +2209,7 @@ async function requestModel() {
             const data = await res.json();
 
             if (!data.ticket) {
-                alert('No discussion thread found for this request.');
+                showToast('info', 'No discussion thread found for this request.');
                 return;
             }
 
@@ -2181,7 +2217,7 @@ async function requestModel() {
             showTicketModal(currentTicketId);
         } catch (e) {
             console.error(e);
-            alert('Failed to load discussion thread');
+            showToast('error', 'Failed to load discussion thread');
         }
     }
 
@@ -2303,10 +2339,10 @@ async function requestModel() {
                 loadTicketMessages(currentTicketId);
             } else {
                 const data = await res.json();
-                alert('Failed to send: ' + (data.detail || 'Unknown error'));
+                showToast('error', 'Failed to send: ' + (data.detail || 'Unknown error'));
             }
         } catch (e) {
-            alert('Failed to send message');
+            showToast('error', 'Failed to send message');
         }
     }
 
@@ -2321,10 +2357,10 @@ async function requestModel() {
                 fetchTickets();
             } else {
                 const data = await res.json();
-                alert('Failed to reopen: ' + (data.detail || 'Unknown error'));
+                showToast('error', 'Failed to reopen: ' + (data.detail || 'Unknown error'));
             }
         } catch (e) {
-            alert('Failed to reopen thread');
+            showToast('error', 'Failed to reopen thread');
         }
     }
 

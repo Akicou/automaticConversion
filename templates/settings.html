@@ -1,0 +1,444 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - GGUF Forge{% endblock %}
+
+{% block head %}
+<style>
+.settings-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.settings-header {
+    margin-bottom: 2rem;
+}
+
+.settings-header h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.settings-header p {
+    color: var(--text-secondary);
+}
+
+.settings-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.settings-section h2 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.setting-item:last-child {
+    border-bottom: none;
+}
+
+.setting-info {
+    flex: 1;
+}
+
+.setting-info h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.setting-info p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.setting-control {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Toggle switch */
+.toggle-switch {
+    position: relative;
+    width: 48px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-tertiary);
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--text-secondary);
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--accent-primary);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(24px);
+    background-color: white;
+}
+
+/* Select dropdown */
+select.setting-select {
+    padding: 0.5rem 2rem 0.5rem 1rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+/* Range slider */
+input[type="range"].setting-range {
+    width: 200px;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    outline: none;
+}
+
+input[type="range"].setting-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+input[type="range"].setting-range::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--accent-primary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* Quant checkboxes */
+.quant-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.quant-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quant-checkbox-item:hover {
+    border-color: var(--border-hover);
+}
+
+.quant-checkbox-item input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.quant-checkbox-item label {
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.save-button {
+    background: var(--accent-primary);
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.save-button:hover {
+    background: var(--accent-hover);
+}
+
+.save-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .setting-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .setting-control {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    input[type="range"].setting-range {
+        width: 100%;
+    }
+
+    .quant-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <div class="settings-header">
+        <h1>⚙️ Settings</h1>
+        <p>Customize your GGUF Forge experience</p>
+    </div>
+
+    <form id="settings-form" onsubmit="saveSettings(event)">
+        <!-- Appearance Section -->
+        <div class="settings-section">
+            <h2>🎨 Appearance</h2>
+
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h3>Theme</h3>
+                    <p>Choose your preferred color scheme</p>
+                </div>
+                <div class="setting-control">
+                    <select id="theme" class="setting-select">
+                        <option value="dark">Dark</option>
+                        <option value="light">Light</option>
+                        <option value="auto">Auto (System)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications Section -->
+        <div class="settings-section">
+            <h2>🔔 Notifications</h2>
+
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h3>Enable Notifications</h3>
+                    <p>Show toast notifications for updates</p>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="notifications_enabled" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Default Quantization Section -->
+        <div class="settings-section">
+            <h2>📊 Default Quantization Types</h2>
+
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h3>Preselected Quants</h3>
+                    <p>Choose which quantization types to select by default</p>
+                </div>
+            </div>
+
+            <div class="quant-grid" id="quant-grid">
+                <!-- Quant checkboxes will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Advanced Section -->
+        <div class="settings-section">
+            <h2>🔧 Advanced</h2>
+
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h3>Auto-Refresh Interval</h3>
+                    <p>How often to refresh the dashboard (seconds)</p>
+                </div>
+                <div class="setting-control">
+                    <input type="range" id="auto_refresh_interval" class="setting-range" min="10" max="120" step="10" value="30" oninput="updateRefreshLabel(this.value)">
+                    <span id="refresh-label">30s</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Button -->
+        <div style="text-align: right; margin-top: 2rem;">
+            <button type="submit" class="save-button">Save Settings</button>
+        </div>
+    </form>
+</div>
+
+<script>
+let currentSettings = {};
+let availableQuants = [];
+
+// Load settings and quants on page load
+async function loadSettings() {
+    try {
+        // Load available quants
+        const quantsRes = await fetch('/api/settings/quants');
+        const quantsData = await quantsRes.json();
+        availableQuants = quantsData.quants;
+        renderQuantCheckboxes();
+
+        // Load user settings
+        const user = '{{ user }}';
+        if (user && user !== 'None') {
+            const settingsRes = await fetch(`/api/settings/user/${user}`);
+            currentSettings = await settingsRes.json();
+            applySettingsToForm();
+        }
+    } catch (e) {
+        console.error('Failed to load settings:', e);
+        showToast('error', 'Failed to load settings');
+    }
+}
+
+function renderQuantCheckboxes() {
+    const grid = document.getElementById('quant-grid');
+    grid.innerHTML = availableQuants.map(quant => `
+        <div class="quant-checkbox-item">
+            <input type="checkbox" id="quant-${quant}" value="${quant}">
+            <label for="quant-${quant}">${quant}</label>
+        </div>
+    `).join('');
+}
+
+function applySettingsToForm() {
+    // Theme
+    if (currentSettings.theme) {
+        document.getElementById('theme').value = currentSettings.theme;
+    }
+
+    // Notifications
+    document.getElementById('notifications_enabled').checked = currentSettings.notifications_enabled !== false;
+
+    // Auto refresh interval
+    const interval = currentSettings.auto_refresh_interval || 30;
+    document.getElementById('auto_refresh_interval').value = interval;
+    updateRefreshLabel(interval);
+
+    // Default quants
+    if (currentSettings.default_quants && Array.isArray(currentSettings.default_quants)) {
+        currentSettings.default_quants.forEach(quant => {
+            const checkbox = document.getElementById(`quant-${quant}`);
+            if (checkbox) checkbox.checked = true;
+        });
+    }
+}
+
+function updateRefreshLabel(value) {
+    document.getElementById('refresh-label').textContent = value + 's';
+}
+
+async function saveSettings(event) {
+    event.preventDefault();
+
+    const submitBtn = document.querySelector('.save-button');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+
+    try {
+        // Collect form data
+        const selectedQuants = availableQuants.filter(quant =>
+            document.getElementById(`quant-${quant}`).checked
+        );
+
+        const settings = {
+            theme: document.getElementById('theme').value,
+            notifications_enabled: document.getElementById('notifications_enabled').checked,
+            auto_refresh_interval: parseInt(document.getElementById('auto_refresh_interval').value),
+            default_quants: selectedQuants.length > 0 ? selectedQuants : null
+        };
+
+        const user = '{{ user }}';
+        if (!user || user === 'None') {
+            showToast('warning', 'Please log in to save settings');
+            return;
+        }
+
+        // Save settings
+        const res = await fetch(`/api/settings/user/${user}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+
+        if (res.ok) {
+            showToast('success', 'Settings saved successfully!');
+
+            // Apply theme immediately if changed
+            if (settings.theme && settings.theme !== 'auto') {
+                themeManager.applyTheme(settings.theme);
+            }
+        } else {
+            const err = await res.json();
+            showToast('error', 'Failed to save settings: ' + (err.detail || 'Unknown error'));
+        }
+    } catch (e) {
+        console.error('Failed to save settings:', e);
+        showToast('error', 'Failed to save settings');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Settings';
+    }
+}
+
+// Load settings on page load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadSettings);
+} else {
+    loadSettings();
+}
+</script>
+{% endblock %}

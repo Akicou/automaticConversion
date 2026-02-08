@@ -342,7 +342,7 @@ async def security_middleware(request: Request, call_next):
 
 
 # --- Configure and Include Routes ---
-from routes import auth, models, requests, tickets
+from routes import auth, models, requests, tickets, settings
 
 # Configure route modules with dependencies
 auth.configure(templates, pwd_context, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_REDIRECT_URI)
@@ -355,6 +355,7 @@ app.include_router(auth.router)
 app.include_router(models.router)
 app.include_router(requests.router)
 app.include_router(tickets.router)
+app.include_router(settings.router)
 
 
 # --- WebSocket Endpoint ---
@@ -445,6 +446,22 @@ async def dashboard(request: Request):
     # User now includes is_oauth and avatar_url fields - no need for separate query
     return templates.TemplateResponse("index.html", {
         "request": request, 
+        "user": user['username'] if user else None,
+        "role": user['role'] if user else 'guest',
+        "oauth_avatar": user.get('avatar_url') if user else None,
+        "is_oauth": bool(user.get('is_oauth')) if user else False
+    })
+
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    """Settings page for user preferences."""
+    user = await get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    return templates.TemplateResponse("settings.html", {
+        "request": request,
         "user": user['username'] if user else None,
         "role": user['role'] if user else 'guest',
         "oauth_avatar": user.get('avatar_url') if user else None,
