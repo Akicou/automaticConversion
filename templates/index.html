@@ -705,6 +705,14 @@
                         size requirement)</span></span>
             </label>
         </div>
+        <!-- Admin option to enable/disable shard merging -->
+        <div style="margin-bottom: 0.75rem;">
+            <label
+                style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer;">
+                <input type="checkbox" class="enable-shard-merge" checked style="accent-color: #60a5fa; cursor: pointer;">
+                <span>🔀 Enable shard merging <span style="opacity: 0.7; font-size: 0.7rem;">(merge GGUF shards into single file for Ollama compatibility)</span></span>
+            </label>
+        </div>
         <div class="decline-reason-row" style="display: flex; gap: 0.5rem; align-items: center;">
             <input type="text" class="decline-reason-input" placeholder="Message (for discussion or decline reason)..."
                 style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 0.5rem; border-radius: 4px; color: var(--text-primary); font-size: 0.85rem;">
@@ -1936,6 +1944,7 @@ async function requestModel() {
                 const checkedBoxes = cardEl.querySelectorAll('.req-quant-cb:checked');
                 const approvedQuants = Array.from(checkedBoxes).map(cb => cb.value);
                 const ignoreSpaceCheck = cardEl.querySelector('.ignore-space-check').checked;
+                const enableShardMerging = cardEl.querySelector('.enable-shard-merge').checked;
 
                 if (approvedQuants.length === 0) {
                     showToast('warning', 'Please select at least one quant type to generate.');
@@ -1950,7 +1959,8 @@ async function requestModel() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         approved_quants: quantsToSend,
-                        ignore_space_check: ignoreSpaceCheck
+                        ignore_space_check: ignoreSpaceCheck,
+                        enable_shard_merging: enableShardMerging
                     })
                 });
                 fetchRequests();

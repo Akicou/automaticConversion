@@ -77,16 +77,6 @@ body,
     border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-[data-theme="light"] .glass-nav {
-    background: rgba(255, 255, 255, 0.9);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-[data-theme="light"] .glass-footer {
-    background: rgba(255, 255, 255, 0.9);
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
-}
-
 [data-theme="light"] .search-panel {
     background: rgba(255, 255, 255, 0.9);
     border: 1px solid rgba(0, 0, 0, 0.15);

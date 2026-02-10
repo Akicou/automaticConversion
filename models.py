@@ -25,6 +25,7 @@ class ApproveRequestBody(BaseModel):
     """Admin can optionally modify quant selection when approving."""
     approved_quants: Optional[List[str]] = None  # If None, uses requested_quants or all quants
     ignore_space_check: Optional[bool] = False  # If True, bypass conservative disk space checks
+    enable_shard_merging: Optional[bool] = True  # If True, merge GGUF shards into single file for Ollama compatibility
 
 
 class RejectRequest(BaseModel):

@@ -175,8 +175,9 @@ async def approve_request(
     
     approved_quants_json = json.dumps(approved_quants)
     
-    # Get ignore_space_check flag from request body (admin only)
+    # Get admin options from request body
     ignore_space_check = body.ignore_space_check if body and body.ignore_space_check else False
+    enable_shard_merging = body.enable_shard_merging if body and hasattr(body, 'enable_shard_merging') else True
     
     # Update request status and approved quants
     await conn.execute(
@@ -193,6 +194,8 @@ async def approve_request(
     log_msg = f"Queued from approved request... Quants: {', '.join(approved_quants)}"
     if ignore_space_check:
         log_msg += "\n⚠ Admin override: Space check disabled"
+    if not enable_shard_merging:
+        log_msg += "\n⚠ Admin override: Shard merging disabled"
     
     await conn.execute(
         "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, ignore_space_check) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -201,8 +204,9 @@ async def approve_request(
     await conn.commit()
     await conn.close()
     
-    # Pass approved quants and space check flag to workflow
-    workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants, ignore_space_check=ignore_space_check)
+    # Pass approved quants and admin flags to workflow
+    workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants,
+                             ignore_space_check=ignore_space_check, enable_shard_merging=enable_shard_merging)
     
     # Add to queue instead of running directly
     queue = get_model_queue()

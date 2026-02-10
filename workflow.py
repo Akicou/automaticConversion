@@ -216,9 +216,10 @@ def set_model_queue(queue: ModelQueue):
 
 
 class ModelWorkflow:
-    def __init__(self, model_id: str, hf_repo_id: str, resume_mode: bool = False, 
+    def __init__(self, model_id: str, hf_repo_id: str, resume_mode: bool = False,
                  completed_quants: Optional[List[str]] = None, quants_to_run: Optional[List[str]] = None,
-                 ignore_space_check: bool = False, force_llama_update: bool = False):
+                 ignore_space_check: bool = False, force_llama_update: bool = False,
+                 enable_shard_merging: bool = True):
         self.model_id = model_id
         self.hf_repo_id = hf_repo_id
         self.log_buffer = []
@@ -247,6 +248,8 @@ class ModelWorkflow:
         self.ignore_space_check = ignore_space_check
         # Force llama.cpp update flag
         self.force_llama_update = force_llama_update
+        # Admin override - enable/disable shard merging
+        self.enable_shard_merging = enable_shard_merging
     
     async def terminate(self):
         """Request termination of this workflow."""
@@ -356,18 +359,24 @@ class ModelWorkflow:
                 return q_path
             await self.log(f"      ⚠ {q_type} Output file missing: {q_path.name}")
             return None
-        
+
         total = shards[0][1]
         shard_paths = [path for _, _, path in shards]
         shard_indices = {idx for idx, _, _ in shards}
         missing = [i for i in range(1, total + 1) if i not in shard_indices]
-        
+
         if missing:
             preview = ", ".join(f"{i:05d}" for i in missing[:5])
             suffix = "..." if len(missing) > 5 else ""
             await self.log(f"      ⚠ {q_type} Shard set incomplete (missing {preview}{suffix})")
             return None
-        
+
+        # Check if shard merging is disabled
+        if not self.enable_shard_merging:
+            await self.log(f"      ℹ {q_type} Shard merging disabled by admin - keeping sharded output")
+            # Return the first shard path as the output
+            return shard_paths[0]
+
         if q_path.exists():
             try:
                 base_mtime = q_path.stat().st_mtime
@@ -377,7 +386,7 @@ class ModelWorkflow:
                     return q_path
             except Exception:
                 pass
-        
+
         await self.log(f"      ℹ {q_type} Output is sharded ({total} parts). Merging...")
         
         try:
