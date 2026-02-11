@@ -1,85 +1,313 @@
 /**
  * Theme CSS Variables
  * Defines color palettes for dark and light themes
+ * Single source of truth for all theme-related CSS variables
  */
 
 :root {
-    /* Dark Theme (default) */
+    /* ============================================
+       DARK THEME (Default)
+       ============================================ */
+
+    /* Background Colors */
+    --bg-color: #0a0a0a;
     --bg-primary: #0a0a0a;
     --bg-secondary: #171717;
     --bg-tertiary: #262626;
     --bg-glass: rgba(20, 20, 20, 0.8);
+    --bg-glass-solid: rgba(18, 18, 18, 0.95);
 
+    /* Body Gradient Background */
+    --bg-gradient-1: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.03), transparent 40%);
+    --bg-gradient-2: radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.02), transparent 40%);
+
+    /* Text Colors */
     --text-primary: #e5e5e5;
     --text-secondary: #a3a3a3;
     --text-tertiary: #737373;
+    --text-on-primary: #000000;
 
+    /* Border Colors */
     --border-color: rgba(255, 255, 255, 0.1);
     --border-hover: rgba(255, 255, 255, 0.2);
+    --glass-border: rgba(255, 255, 255, 0.08);
 
+    /* Accent Colors */
     --accent-primary: #60a5fa;
     --accent-hover: #3b82f6;
 
+    /* Semantic Colors */
     --success: #4ade80;
+    --success-bg: rgba(74, 222, 128, 0.1);
     --warning: #facc15;
+    --warning-bg: rgba(250, 204, 21, 0.1);
     --error: #f87171;
+    --error-bg: rgba(248, 113, 113, 0.1);
     --info: #60a5fa;
+    --info-bg: rgba(96, 165, 250, 0.1);
 
+    /* Button Colors */
+    --primary: #ffffff;
+    --primary-hover: #e5e5e5;
+    --button-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
+    --button-shadow-hover: 0 6px 16px rgba(255, 255, 255, 0.2);
+
+    /* Card Colors */
+    --card-bg: rgba(255, 255, 255, 0.02);
+    --card-hover-bg: rgba(255, 255, 255, 0.04);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --card-border-hover: rgba(255, 255, 255, 0.12);
+
+    /* Glass Panel */
     --glass-bg: rgba(20, 20, 20, 0.6);
-    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-panel-bg: rgba(255, 255, 255, 0.02);
+    --glass-panel-hover: rgba(255, 255, 255, 0.04);
 
+    /* Filter/Chip Colors */
+    --filter-bg: transparent;
+    --filter-bg-hover: rgba(255, 255, 255, 0.05);
+    --filter-bg-active: #ffffff;
+    --filter-text-active: #000000;
+    --filter-border: rgba(255, 255, 255, 0.08);
+    --filter-border-hover: rgba(255, 255, 255, 0.15);
+
+    /* Status Badge */
+    --badge-bg: rgba(255, 255, 255, 0.05);
+    --badge-border: rgba(255, 255, 255, 0.1);
+
+    /* Progress Bar */
+    --progress-bg: rgba(255, 255, 255, 0.03);
+    --progress-fill: linear-gradient(90deg, #e5e5e5, rgba(255, 255, 255, 0.7));
+
+    /* Input Colors */
+    --input-bg: var(--bg-primary);
+    --input-border: var(--border-color);
+
+    /* Empty State */
+    --empty-bg: rgba(255, 255, 255, 0.02);
+    --empty-border: var(--border-color);
+
+    /* Logs */
+    --logs-bg: rgba(0, 0, 0, 0.4);
+    --logs-text: rgba(255, 255, 255, 0.8);
+    --logs-border: rgba(255, 255, 255, 0.05);
+
+    /* Scrollbar */
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+
+    /* Header/Glass Nav */
+    --nav-glass-bg: rgba(20, 20, 20, 0.8);
+    --nav-glass-blur: blur(12px);
+    --nav-border-bottom: rgba(255, 255, 255, 0.1);
+
+    /* Theme Toggle Button */
+    --theme-btn-bg: transparent;
+    --theme-btn-bg-hover: rgba(255, 255, 255, 0.05);
+    --theme-btn-border: var(--border-color);
+
+    /* Link Colors */
+    --link-color: var(--accent-primary);
+    --link-hover: var(--accent-hover);
+
+    /* Validation Colors */
+    --validation-success: #22c55e;
+    --validation-error: #ef4444;
+
+    /* Shadows */
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
 
+    /* Transitions */
     --transition-speed: 0.3s;
+    --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Quant Chips */
+    --quant-bg: rgba(255, 255, 255, 0.03);
+    --quant-border: rgba(255, 255, 255, 0.08);
+    --quant-bg-hover: rgba(255, 255, 255, 0.06);
+    --quant-border-hover: rgba(255, 255, 255, 0.15);
 }
 
 [data-theme="light"] {
-    /* Light Theme */
+    /* ============================================
+       LIGHT THEME
+       ============================================ */
+
+    /* Background Colors */
+    --bg-color: #f8fafc;
     --bg-primary: #ffffff;
-    --bg-secondary: #f5f5f5;
-    --bg-tertiary: #e5e5e5;
-    --bg-glass: rgba(255, 255, 255, 0.9);
+    --bg-secondary: #f1f5f9;
+    --bg-tertiary: #e2e8f0;
+    --bg-glass: rgba(255, 255, 255, 0.85);
+    --bg-glass-solid: rgba(255, 255, 255, 0.95);
 
-    --text-primary: #171717;
-    --text-secondary: #525252;
-    --text-tertiary: #737373;
+    /* Body Gradient Background - Subtle light gradient */
+    --bg-gradient-1: radial-gradient(circle at 20% 50%, rgba(0, 0, 0, 0.02), transparent 40%);
+    --bg-gradient-2: radial-gradient(circle at 80% 30%, rgba(0, 0, 0, 0.015), transparent 40%);
 
+    /* Text Colors */
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-tertiary: #94a3b8;
+    --text-on-primary: #ffffff;
+
+    /* Border Colors */
     --border-color: rgba(0, 0, 0, 0.1);
-    --border-hover: rgba(0, 0, 0, 0.2);
-
-    --glass-bg: rgba(255, 255, 255, 0.7);
+    --border-hover: rgba(0, 0, 0, 0.15);
     --glass-border: rgba(0, 0, 0, 0.08);
 
+    /* Accent Colors - Same for consistency */
+    --accent-primary: #3b82f6;
+    --accent-hover: #2563eb;
+
+    /* Semantic Colors */
+    --success: #22c55e;
+    --success-bg: rgba(34, 197, 94, 0.1);
+    --warning: #f59e0b;
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    --error: #ef4444;
+    --error-bg: rgba(239, 68, 68, 0.1);
+    --info: #3b82f6;
+    --info-bg: rgba(59, 130, 246, 0.1);
+
+    /* Button Colors */
+    --primary: #1e293b;
+    --primary-hover: #0f172a;
+    --button-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --button-shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.15);
+
+    /* Card Colors */
+    --card-bg: rgba(255, 255, 255, 0.8);
+    --card-hover-bg: rgba(255, 255, 255, 0.95);
+    --card-border: rgba(0, 0, 0, 0.08);
+    --card-border-hover: rgba(0, 0, 0, 0.12);
+
+    /* Glass Panel */
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-panel-bg: rgba(255, 255, 255, 0.8);
+    --glass-panel-hover: rgba(255, 255, 255, 0.9);
+
+    /* Filter/Chip Colors */
+    --filter-bg: transparent;
+    --filter-bg-hover: rgba(0, 0, 0, 0.04);
+    --filter-bg-active: #1e293b;
+    --filter-text-active: #ffffff;
+    --filter-border: rgba(0, 0, 0, 0.12);
+    --filter-border-hover: rgba(0, 0, 0, 0.18);
+
+    /* Status Badge */
+    --badge-bg: rgba(0, 0, 0, 0.04);
+    --badge-border: rgba(0, 0, 0, 0.1);
+
+    /* Progress Bar */
+    --progress-bg: rgba(0, 0, 0, 0.05);
+    --progress-fill: linear-gradient(90deg, #1e293b, #475569);
+
+    /* Input Colors */
+    --input-bg: #ffffff;
+    --input-border: rgba(0, 0, 0, 0.15);
+
+    /* Empty State */
+    --empty-bg: rgba(0, 0, 0, 0.02);
+    --empty-border: rgba(0, 0, 0, 0.1);
+
+    /* Logs */
+    --logs-bg: rgba(0, 0, 0, 0.95);
+    --logs-text: rgba(255, 255, 255, 0.9);
+    --logs-border: rgba(255, 255, 255, 0.1);
+
+    /* Scrollbar */
+    --scrollbar-track: rgba(0, 0, 0, 0.05);
+    --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+
+    /* Header/Glass Nav */
+    --nav-glass-bg: rgba(255, 255, 255, 0.85);
+    --nav-glass-blur: blur(12px);
+    --nav-border-bottom: rgba(0, 0, 0, 0.1);
+
+    /* Theme Toggle Button */
+    --theme-btn-bg: transparent;
+    --theme-btn-bg-hover: rgba(0, 0, 0, 0.05);
+    --theme-btn-border: var(--border-color);
+
+    /* Link Colors */
+    --link-color: #2563eb;
+    --link-hover: #1d4ed8;
+
+    /* Validation Colors */
+    --validation-success: #16a34a;
+    --validation-error: #dc2626;
+
+    /* Shadows */
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.15);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+
+    /* Quant Chips */
+    --quant-bg: rgba(0, 0, 0, 0.03);
+    --quant-border: rgba(0, 0, 0, 0.08);
+    --quant-bg-hover: rgba(0, 0, 0, 0.06);
+    --quant-border-hover: rgba(0, 0, 0, 0.12);
 }
 
-/* Theme transition for smooth switching */
+/* ============================================
+   THEME TRANSITIONS - Smooth theme switching
+   ============================================ */
+
+/* Apply transitions to all theme-affected elements */
 body,
-.glass-panel,
 .glass-nav,
+.glass-nav *,
 .glass-footer,
+.glass-footer *,
+.glass-panel,
 .card,
-.button {
+.model-card,
+.request-card,
+.ticket-card,
+.filter-chip,
+.status-badge,
+button,
+a,
+input,
+textarea,
+select,
+.progress-bar-bg,
+.progress-bar-fill,
+.quant-chip,
+.logs,
+.empty-state {
     transition: background-color var(--transition-speed) ease,
                 border-color var(--transition-speed) ease,
                 color var(--transition-speed) ease,
-                box-shadow var(--transition-speed) ease;
+                box-shadow var(--transition-speed) ease,
+                fill var(--transition-speed) ease,
+                stroke var(--transition-speed) ease;
 }
 
-/* Light theme specific overrides */
+/* ============================================
+   LIGHT THEME SPECIFIC OVERRIDES
+   ============================================ */
+
+/* Nav Button (ensure text is visible) */
+.nav-btn {
+    color: var(--text-primary);
+}
+
+/* Glass Panel */
 [data-theme="light"] .glass-panel {
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: var(--glass-panel-bg);
+    border: 1px solid var(--card-border);
 }
 
+/* Search Panel */
 [data-theme="light"] .search-panel {
     background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.12);
 }
 
 [data-theme="light"] .search-panel input {
@@ -91,67 +319,235 @@ body,
     color: var(--text-tertiary);
 }
 
+/* Suggestions */
 [data-theme="light"] .suggestions-item {
     background: transparent;
 }
 
 [data-theme="light"] .suggestions-item:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.04);
 }
 
+/* Model/Request/Ticket Cards */
 [data-theme="light"] .model-card,
 [data-theme="light"] .request-card,
 [data-theme="light"] .ticket-card {
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
 }
 
+[data-theme="light"] .model-card:hover,
+[data-theme="light"] .request-card:hover,
+[data-theme="light"] .ticket-card:hover {
+    background: var(--card-hover-bg);
+    border-color: var(--card-border-hover);
+}
+
+/* Empty State */
 [data-theme="light"] .empty-state {
-    background: rgba(0, 0, 0, 0.02);
-    border-color: rgba(0, 0, 0, 0.1);
+    background: var(--empty-bg);
+    border-color: var(--empty-border);
 }
 
-/* Ensure text is readable in light theme */
-[data-theme="light"] body,
-[data-theme="light"] .nav-logo,
-[data-theme="light"] .nav-item,
-[data-theme="light"] .nav-btn {
+/* Navigation */
+.nav-btn {
     color: var(--text-primary);
 }
 
-/* Fix validation messages in light theme */
+[data-theme="light"] .nav-logo,
+[data-theme="light"] .nav-item,
+[data-theme="light"] .nav-btn,
+[data-theme="light"] .user-name {
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .nav-item:hover,
+[data-theme="light"] .nav-item.active {
+    color: var(--text-primary);
+    background-color: var(--bg-secondary);
+}
+
+/* Theme Button Hover */
+[data-theme="light"] .theme-btn:hover {
+    background: var(--theme-btn-bg-hover);
+    border-color: var(--border-hover);
+}
+
+/* Validation Messages */
 [data-theme="light"] .validation-message.error {
-    color: #dc2626;
+    color: var(--validation-error);
 }
 
 [data-theme="light"] .validation-message.success {
-    color: #16a34a;
+    color: var(--validation-success);
 }
 
-/* Fix inputs in light theme */
+/* Inputs */
 [data-theme="light"] input,
 [data-theme="light"] textarea,
 [data-theme="light"] select {
-    background: var(--bg-primary);
+    background: var(--input-bg);
     color: var(--text-primary);
-    border-color: var(--border-color);
+    border-color: var(--input-border);
 }
 
-/* Fix buttons in light theme */
+/* Primary Buttons */
 [data-theme="light"] button.primary {
-    background: var(--accent-primary);
-    color: #ffffff;
+    background: var(--primary);
+    color: var(--text-on-primary);
 }
 
 [data-theme="light"] button.primary:hover {
-    background: var(--accent-hover);
+    background: var(--primary-hover);
 }
 
-/* Fix links in light theme */
+/* Links */
 [data-theme="light"] a {
-    color: var(--accent-primary);
+    color: var(--link-color);
 }
 
 [data-theme="light"] a:hover {
-    color: var(--accent-hover);
+    color: var(--link-hover);
 }
+
+/* Filter Chips Active State */
+[data-theme="light"] .filter-chip.active {
+    background: var(--filter-bg-active);
+    color: var(--filter-text-active);
+    border-color: var(--filter-bg-active);
+}
+
+/* Status Badge */
+[data-theme="light"] .status-badge {
+    background: var(--badge-bg);
+    border: 1px solid var(--badge-border);
+}
+
+/* Quant Chips */
+[data-theme="light"] .quant-chip {
+    background: var(--quant-bg);
+    border: 1px solid var(--quant-border);
+}
+
+[data-theme="light"] .quant-chip:hover {
+    background: var(--quant-bg-hover);
+    border-color: var(--quant-border-hover);
+}
+
+[data-theme="light"] .quant-chip.completed {
+    background: var(--success-bg);
+    border-color: var(--success);
+    color: var(--success);
+}
+
+[data-theme="light"] .quant-chip.pending {
+    background: var(--info-bg);
+    border-color: var(--info);
+    color: var(--info);
+}
+
+/* Progress Bar */
+[data-theme="light"] .progress-bar-bg {
+    background: var(--progress-bg);
+}
+
+[data-theme="light"] .progress-bar-fill {
+    background: var(--progress-fill);
+}
+
+/* Logs Viewer */
+[data-theme="light"] .logs {
+    background: var(--logs-bg);
+    border: 1px solid var(--logs-border);
+    color: var(--logs-text);
+}
+
+/* Scrollbar - Light theme */
+[data-theme="light"] ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+/* Footer */
+[data-theme="light"] .footer-content {
+    color: var(--text-secondary);
+}
+
+[data-theme="light"] .footer-links a {
+    color: var(--text-secondary);
+}
+
+[data-theme="light"] .footer-links a:hover {
+    color: var(--text-primary);
+}
+
+/* User Menu */
+[data-theme="light"] .user-menu {
+    border-left: 1px solid var(--border-color);
+}
+
+/* Logout Button */
+.logout-btn {
+    color: var(--error) !important;
+}
+
+[data-theme="light"] .logout-btn {
+    color: var(--error) !important;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+[data-theme="light"] .logout-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Login Button */
+.login-btn {
+    background: var(--primary);
+    color: var(--text-on-primary) !important;
+}
+
+.login-btn:hover {
+    background: var(--primary-hover);
+    color: var(--text-on-primary) !important;
+}
+
+[data-theme="light"] .login-btn {
+    background: var(--primary);
+    color: var(--text-on-primary) !important;
+}
+
+[data-theme="light"] .login-btn:hover {
+    background: var(--primary-hover);
+    color: var(--text-on-primary) !important;
+}
+
+/* Mobile Navigation Drawer */
+[data-theme="light"] .nav-links {
+    background: var(--bg-glass-solid);
+    border-left: 1px solid var(--border-color);
+}
+
+[data-theme="light"] .nav-links.nav-links-open::before {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Hamburger Button */
+[data-theme="light"] .hamburger-btn span {
+    background: var(--text-primary);
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.text-success { color: var(--success); }
+.text-error { color: var(--error); }
+.text-warning { color: var(--warning); }
+.text-info { color: var(--info); }

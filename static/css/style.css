@@ -1,18 +1,8 @@
-:root {
-    --bg-color: #000000;
-    --text-primary: #ffffff;
-    --text-secondary: #888888;
-    --glass-bg: rgba(18, 18, 18, 0.8);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --primary: #ffffff;
-    --primary-hover: #e5e5e5;
-    --success: #22c55e;
-    --error: #ef4444;
-    --warning: #f59e0b;
-    --info: #3b82f6;
-    --card-bg: rgba(255, 255, 255, 0.02);
-    --card-hover-bg: rgba(255, 255, 255, 0.04);
-}
+/**
+ * Main Stylesheet
+ * All CSS variables are defined in theme.css
+ * This file contains layout, components, and utility styles
+ */
 
 body {
     margin: 0;
@@ -21,13 +11,12 @@ body {
     background-color: var(--bg-color);
     color: var(--text-primary);
     line-height: 1.6;
-    background-image:
-        radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.03), transparent 40%),
-        radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.02), transparent 40%);
+    background-image: var(--bg-gradient-1), var(--bg-gradient-2);
     background-attachment: fixed;
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
 }
 
 /* Layout */
@@ -60,9 +49,11 @@ body {
 
 /* Navigation */
 .glass-nav {
-    background: var(--bg-primary);
+    background: var(--nav-glass-bg);
+    backdrop-filter: var(--nav-glass-blur);
+    -webkit-backdrop-filter: var(--nav-glass-blur);
     box-shadow: var(--shadow-sm);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--nav-border-bottom);
     position: sticky;
     top: 0;
     z-index: 50;
@@ -133,7 +124,9 @@ body {
         right: -100%;
         width: 280px;
         height: calc(100vh - 60px);
-        background: var(--bg-secondary);
+        background: var(--bg-glass-solid);
+        backdrop-filter: var(--nav-glass-blur);
+        -webkit-backdrop-filter: var(--nav-glass-blur);
         border-left: 1px solid var(--border-color);
         flex-direction: column;
         padding: 2rem 1.5rem;
@@ -157,6 +150,10 @@ body {
         bottom: 0;
         background: rgba(0, 0, 0, 0.5);
         z-index: -1;
+    }
+
+    [data-theme="light"] .nav-links.nav-links-open::before {
+        background: rgba(0, 0, 0, 0.3);
     }
 
     /* Touch-friendly targets */
@@ -255,15 +252,20 @@ body {
     font-size: 0.85rem;
     font-weight: 500;
     transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .login-btn {
     background: var(--primary);
-    color: white;
+    color: var(--text-on-primary);
+    border: none;
 }
 
 .login-btn:hover {
     background: var(--primary-hover);
+    color: var(--text-on-primary);
 }
 
 .logout-btn {
@@ -276,8 +278,8 @@ body {
 }
 
 .theme-btn {
-    background: transparent;
-    border: 1px solid var(--border-color);
+    background: var(--theme-btn-bg);
+    border: 1px solid var(--theme-btn-border);
     color: var(--text-primary);
     cursor: pointer;
     display: flex;
@@ -287,15 +289,22 @@ body {
     padding: 0.5rem;
     width: 40px;
     height: 40px;
+    border-radius: 8px;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 
 .theme-btn:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--theme-btn-bg-hover);
     border-color: var(--border-hover);
 }
 
-[data-theme="light"] .theme-btn:hover {
-    background: rgba(0, 0, 0, 0.05);
+.theme-btn:active {
+    transform: scale(0.95);
+}
+
+.theme-btn:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
 }
 
 /* Hamburger Button - Hidden on desktop by default */
@@ -374,17 +383,18 @@ body {
 
 /* Components */
 .glass-panel {
-    background: var(--card-bg);
+    background: var(--glass-panel-bg);
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-radius: 8px;
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-panel:hover {
-    background: var(--card-hover-bg);
-    border-color: rgba(255, 255, 255, 0.12);
+    background: var(--glass-panel-hover);
+    border-color: var(--card-border-hover);
     transform: translateY(-2px);
 }
 
@@ -400,7 +410,7 @@ button {
 
 button.primary {
     background: var(--primary);
-    color: white;
+    color: var(--text-on-primary);
     border: none;
     padding: 0.5rem 1rem;
     border-radius: 6px;
@@ -549,16 +559,16 @@ select:focus {
 }
 
 ::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--scrollbar-thumb);
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: var(--scrollbar-thumb-hover);
 }
 
 @media (max-width: 768px) {
@@ -580,12 +590,13 @@ select:focus {
     border: 1px solid var(--glass-border);
     border-radius: 8px;
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
 .filter-chip {
     padding: 0.5rem 1rem;
-    background: transparent;
-    border: 1px solid var(--glass-border);
+    background: var(--filter-bg);
+    border: 1px solid var(--filter-border);
     border-radius: 20px;
     color: var(--text-secondary);
     font-size: 0.85rem;
@@ -596,15 +607,15 @@ select:focus {
 }
 
 .filter-chip:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.15);
+    background: var(--filter-bg-hover);
+    border-color: var(--filter-border-hover);
     color: var(--text-primary);
 }
 
 .filter-chip.active {
-    background: var(--text-primary);
-    color: #000000;
-    border-color: var(--text-primary);
+    background: var(--filter-bg-active);
+    color: var(--filter-text-active);
+    border-color: var(--filter-bg-active);
 }
 
 .filter-chip .count {
@@ -689,8 +700,8 @@ select:focus {
     font-weight: 600;
     letter-spacing: 0.03em;
     text-transform: uppercase;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--badge-bg);
+    border: 1px solid var(--badge-border);
     transition: all 0.2s;
 }
 
@@ -728,12 +739,12 @@ select:focus {
 .progress-bar-bg {
     position: relative;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--progress-bg);
     border-radius: 10px;
 }
 
 .progress-bar-fill {
-    background: linear-gradient(90deg, var(--text-primary), rgba(255, 255, 255, 0.7));
+    background: var(--progress-fill);
     transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
@@ -771,15 +782,15 @@ select:focus {
     gap: 0.5rem;
     margin-top: 1rem;
     padding: 1rem;
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--bg-secondary);
     border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
 }
 
 .quant-chip {
     padding: 0.5rem 0.75rem;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--quant-bg);
+    border: 1px solid var(--quant-border);
     border-radius: 6px;
     font-size: 0.75rem;
     font-family: 'JetBrains Mono', monospace;
@@ -788,19 +799,19 @@ select:focus {
 }
 
 .quant-chip:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.15);
+    background: var(--quant-bg-hover);
+    border-color: var(--quant-border-hover);
     transform: scale(1.05);
 }
 
 .quant-chip.completed {
-    background: rgba(34, 197, 94, 0.1);
+    background: var(--success-bg);
     border-color: var(--success);
     color: var(--success);
 }
 
 .quant-chip.pending {
-    background: rgba(59, 130, 246, 0.1);
+    background: var(--info-bg);
     border-color: var(--info);
     color: var(--info);
 }
@@ -819,15 +830,15 @@ button:active {
 }
 
 button.primary {
-    background: var(--text-primary);
-    color: #000000;
+    background: var(--primary);
+    color: var(--text-on-primary);
     font-weight: 600;
-    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
+    box-shadow: var(--button-shadow);
 }
 
 button.primary:hover {
     background: var(--primary-hover);
-    box-shadow: 0 6px 16px rgba(255, 255, 255, 0.2);
+    box-shadow: var(--button-shadow-hover);
 }
 
 /* ===== LOGS VIEWER ===== */
@@ -835,11 +846,11 @@ button.primary:hover {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.7rem;
     line-height: 1.5;
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--logs-bg);
+    border: 1px solid var(--logs-border);
     border-radius: 6px;
     padding: 0.75rem;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--logs-text);
     white-space: pre-wrap;
     overflow-y: auto;
     max-height: 200px;
@@ -847,8 +858,7 @@ button.primary:hover {
 }
 
 .logs:hover {
-    background: rgba(0, 0, 0, 0.5);
-    border-color: rgba(255, 255, 255, 0.1);
+    filter: brightness(1.1);
 }
 
 /* ===== EMPTY STATE ===== */
@@ -856,13 +866,16 @@ button.primary:hover {
     text-align: center;
     padding: 4rem 2rem;
     color: var(--text-secondary);
+    background: var(--empty-bg);
+    border: 1px solid var(--empty-border);
+    border-radius: 12px;
     animation: fadeIn 0.5s;
 }
 
 .empty-state-icon {
     font-size: 3rem;
     margin-bottom: 1rem;
-    opacity: 0.3;
+    opacity: 0.5;
 }
 
 .empty-state-text {
@@ -885,7 +898,7 @@ button.primary:hover {
     display: inline-block;
     width: 16px;
     height: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
+    border: 2px solid var(--border-color);
     border-top-color: var(--text-primary);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
