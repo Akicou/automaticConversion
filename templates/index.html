@@ -1302,7 +1302,8 @@ async function convertModel() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     model_id: modelId,
-                    quants: selectedQuants.length > 0 ? selectedQuants : null
+                    quants: selectedQuants.length > 0 ? selectedQuants : null,
+                    ignore_space_check: !document.getElementById('validationCheck').checked
                 })
             });
 

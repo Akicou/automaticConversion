@@ -127,18 +127,32 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
         await conn.execute("DELETE FROM models WHERE hf_repo_id = ?", (req.model_id,))
     
     quants_msg = ', '.join(quants_to_run) if len(quants_to_run) < len(available_quants) else 'all quants'
+
+    # Get admin options
+    ignore_space_check = req.ignore_space_check if hasattr(req, 'ignore_space_check') else False
+    enable_shard_merging = req.enable_shard_merging if hasattr(req, 'enable_shard_merging') else True
+
+    # Build log message
+    log_msg = f"Queued... Quants: {quants_msg}"
+    if ignore_space_check:
+        log_msg += "\n⚠ Admin override: Space check disabled"
+    if not enable_shard_merging:
+        log_msg += "\n⚠ Admin override: Shard merging disabled"
+
     await conn.execute(
-        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, quants_to_run) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (new_id, req.model_id, "pending", 0, f"Queued... Quants: {quants_msg}", "", json.dumps(quants_to_run))
+        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, quants_to_run, ignore_space_check, enable_shard_merging) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (new_id, req.model_id, "pending", 0, log_msg, "", json.dumps(quants_to_run), 1 if ignore_space_check else 0, 1 if enable_shard_merging else 0)
     )
     await conn.commit()
     await conn.close()
-    
+
     workflow = ModelWorkflow(
-        new_id, 
-        req.model_id, 
+        new_id,
+        req.model_id,
         quants_to_run=quants_to_run,
-        force_llama_update=req.force_llama_update if hasattr(req, 'force_llama_update') else False
+        force_llama_update=req.force_llama_update if hasattr(req, 'force_llama_update') else False,
+        ignore_space_check=ignore_space_check,
+        enable_shard_merging=enable_shard_merging
     )
     
     # Add to queue instead of running directly

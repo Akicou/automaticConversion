@@ -14,6 +14,8 @@ class ProcessRequest(BaseModel):
     model_id: str
     quants: Optional[List[str]] = None  # If None, uses all quants
     force_llama_update: Optional[bool] = False  # If True, forcefully update llama.cpp to latest commit
+    ignore_space_check: Optional[bool] = False  # If True, bypass conservative disk space checks
+    enable_shard_merging: Optional[bool] = True  # If True, merge GGUF shards into single file for Ollama compatibility
 
 
 class ModelRequestSubmit(BaseModel):
