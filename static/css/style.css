@@ -88,201 +88,170 @@ body {
         order: 3;
     }
 
-    /* Modern animated hamburger button */
+    /* Clean modern hamburger button */
     .hamburger-btn {
         display: flex !important;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         gap: 5px;
-        width: 46px;
-        height: 46px;
-        background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
-        border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 12px;
+        width: 44px;
+        height: 44px;
+        background: transparent;
+        border: none;
+        border-radius: 8px;
         cursor: pointer;
-        padding: 12px;
+        padding: 10px;
         z-index: 51;
-        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        box-shadow:
-            0 4px 15px rgba(0,0,0,0.2),
-            inset 0 1px 0 rgba(255,255,255,0.1);
+        transition: all 0.2s ease;
         -webkit-tap-highlight-color: transparent;
         flex-shrink: 0;
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .hamburger-btn::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: radial-gradient(circle at center, rgba(255,255,255,0.2) 0%, transparent 70%);
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-
-    .hamburger-btn:hover::before {
-        opacity: 1;
     }
 
     .hamburger-btn:active {
-        transform: scale(0.92);
+        transform: scale(0.95);
+        background: var(--bg-tertiary);
     }
 
     .hamburger-btn span {
         display: block;
-        width: 20px;
+        width: 22px;
         height: 2px;
-        background: linear-gradient(90deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
+        background: var(--text-primary);
         border-radius: 2px;
-        transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        transition: all 0.3s cubic-bezier(0.32, 0.72, 0, 1);
         transform-origin: center;
-        position: relative;
-    }
-
-    .hamburger-btn span:nth-child(1) {
-        transition-delay: 0.05s;
-    }
-
-    .hamburger-btn span:nth-child(2) {
-        transition-delay: 0.1s;
-    }
-
-    .hamburger-btn span:nth-child(3) {
-        transition-delay: 0.15s;
     }
 
     .hamburger-btn:hover {
-        background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-        border-color: rgba(255,255,255,0.25);
-        box-shadow:
-            0 6px 20px rgba(0,0,0,0.25),
-            0 0 0 1px rgba(255,255,255,0.1),
-            inset 0 1px 0 rgba(255,255,255,0.15);
-        transform: scale(1.05);
+        background: var(--bg-tertiary);
     }
 
     /* Open state - X transformation */
-    .hamburger-btn.hamburger-open {
-        background: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.1) 100%);
-        border-color: rgba(255,255,255,0.3);
-        box-shadow:
-            0 6px 25px rgba(0,0,0,0.3),
-            inset 0 1px 0 rgba(255,255,255,0.2);
-        transform: rotate(180deg);
-    }
-
-    .hamburger-btn.hamburger-open span {
-        background: rgba(255,255,255,0.95);
-    }
-
     .hamburger-btn.hamburger-open span:nth-child(1) {
         transform: translateY(7px) rotate(45deg);
-        transition-delay: 0s;
     }
 
     .hamburger-btn.hamburger-open span:nth-child(2) {
         opacity: 0;
         transform: scaleX(0);
-        transition-delay: 0.05s;
     }
 
     .hamburger-btn.hamburger-open span:nth-child(3) {
         transform: translateY(-7px) rotate(-45deg);
-        transition-delay: 0s;
     }
 
-    /* Mobile Navigation Drawer */
+    /* Mobile Navigation Drawer - Modern slide-in panel */
     .nav-links {
         position: fixed;
-        top: 60px;
+        top: 0;
         right: -100%;
-        width: 280px;
-        height: calc(100vh - 60px);
-        background: var(--bg-glass-solid);
-        backdrop-filter: var(--nav-glass-blur);
-        -webkit-backdrop-filter: var(--nav-glass-blur);
+        width: 85%;
+        max-width: 320px;
+        height: 100vh;
+        background: var(--bg-secondary);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
         border-left: 1px solid var(--border-color);
         flex-direction: column;
-        padding: 2rem 1.5rem;
-        gap: 1rem;
-        transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 49;
+        padding: 0;
+        gap: 0;
+        transition: right 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+        z-index: 50;
         overflow-y: auto;
+        box-shadow: -10px 0 40px rgba(0, 0, 0, 0.3);
     }
 
     .nav-links.nav-links-open {
         right: 0;
     }
 
-    /* Backdrop overlay for mobile drawer */
-    .nav-links.nav-links-open::before {
+    /* Drawer header */
+    .nav-links::before {
+        content: 'Menu';
+        display: block;
+        padding: 1.25rem 1.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-tertiary);
+    }
+
+    /* Backdrop overlay */
+    .nav-links.nav-links-open::after {
         content: '';
         position: fixed;
-        top: 60px;
+        top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(0, 0, 0, 0.6);
         z-index: -1;
+        animation: fadeIn 0.3s ease;
     }
 
-    [data-theme="light"] .nav-links.nav-links-open::before {
-        background: rgba(0, 0, 0, 0.3);
+    [data-theme="light"] .nav-links.nav-links-open::after {
+        background: rgba(0, 0, 0, 0.4);
     }
 
-    /* Light theme hamburger button */
-    [data-theme="light"] .hamburger-btn {
-        background: linear-gradient(135deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.02) 100%);
-        border-color: rgba(0,0,0,0.1);
-        box-shadow:
-            0 4px 15px rgba(0,0,0,0.08),
-            inset 0 1px 0 rgba(255,255,255,0.5);
-    }
-
+    /* Light theme hamburger */
     [data-theme="light"] .hamburger-btn span {
-        background: linear-gradient(90deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.5) 100%);
+        background: var(--text-primary);
     }
 
     [data-theme="light"] .hamburger-btn:hover {
-        background: linear-gradient(135deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.04) 100%);
-        border-color: rgba(0,0,0,0.15);
-        box-shadow:
-            0 6px 20px rgba(0,0,0,0.12),
-            0 0 0 1px rgba(0,0,0,0.05),
-            inset 0 1px 0 rgba(255,255,255,0.6);
+        background: var(--bg-tertiary);
     }
 
-    [data-theme="light"] .hamburger-btn.hamburger-open {
-        background: linear-gradient(135deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.05) 100%);
-        border-color: rgba(0,0,0,0.2);
+    [data-theme="light"] .hamburger-btn:active {
+        background: var(--bg-hover);
     }
 
-    [data-theme="light"] .hamburger-btn.hamburger-open span {
-        background: rgba(0,0,0,0.8);
-    }
-
-    /* Touch-friendly targets */
+    /* Touch-friendly nav items with modern styling */
     .nav-item,
     .nav-btn {
-        min-height: 44px;
+        min-height: 52px;
         display: flex;
         align-items: center;
-        padding: 0.75rem 1rem;
+        padding: 0.875rem 1.5rem;
+        border-radius: 0;
+        border-bottom: 1px solid var(--border-color);
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+    .nav-item:hover,
+    .nav-btn:hover {
+        background: var(--bg-tertiary);
+    }
+
+    .nav-item:active,
+    .nav-btn:active {
+        background: var(--bg-hover);
+    }
+
+    .nav-item.active {
+        background: var(--bg-tertiary);
+        border-left: 3px solid var(--accent);
+        padding-left: calc(1.5rem - 3px);
     }
 
     .user-menu {
         flex-direction: column;
-        gap: 1rem;
-        padding: 1rem 0;
+        gap: 0;
+        padding: 0;
         border-top: 1px solid var(--border-color);
         margin-top: auto;
+        background: var(--bg-tertiary);
+    }
+
+    .user-menu .user-name {
+        padding: 1rem 1.5rem;
+        font-weight: 500;
+        border-bottom: 1px solid var(--border-color);
     }
 }
 
