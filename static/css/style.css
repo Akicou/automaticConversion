@@ -74,35 +74,45 @@ body {
         padding: 0 0.75rem;
     }
 
-    /* Show hamburger button on mobile/tablet */
+    /* Show hamburger button on mobile/tablet - More visible */
     .hamburger-btn {
         display: flex;
         flex-direction: column;
         justify-content: space-around;
-        width: 32px;
-        height: 24px;
-        background: transparent;
-        border: none;
+        width: 44px;
+        height: 44px;
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 10px;
         cursor: pointer;
-        padding: 0;
+        padding: 10px;
         z-index: 51;
-        transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        -webkit-tap-highlight-color: transparent;
     }
 
     .hamburger-btn:active {
         transform: scale(0.95);
+        background: var(--bg-tertiary);
     }
 
     .hamburger-btn span {
         width: 100%;
-        height: 2.5px;
+        height: 3px;
         background: var(--text-primary);
-        border-radius: 2px;
+        border-radius: 3px;
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+        transform-origin: center;
     }
 
-    .hamburger-btn:hover span {
-        opacity: 0.8;
+    .hamburger-btn:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--border-hover);
+    }
+
+    .hamburger-btn.hamburger-open {
+        background: var(--bg-tertiary);
     }
 
     .hamburger-btn.hamburger-open span:nth-child(1) {
@@ -906,4 +916,96 @@ button.primary:hover {
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* ===== TICKET MODAL MOBILE STYLES ===== */
+@media (max-width: 640px) {
+    /* Full-screen ticket modal on mobile */
+    #ticket-modal .ticket-modal-content {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        transform: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+        padding: 1rem !important;
+    }
+
+    #ticket-modal .ticket-modal-backdrop {
+        display: none !important;
+    }
+
+    /* Better touch-friendly header */
+    #ticket-modal .ticket-modal-content > div:first-child {
+        padding: 0.5rem 0;
+        margin-bottom: 0.75rem !important;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    #ticket-modal h3 {
+        font-size: 1rem !important;
+        padding-right: 0.5rem;
+    }
+
+    #ticket-modal button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Better message input on mobile */
+    #ticket-reply-input {
+        font-size: 16px !important; /* Prevents iOS zoom on focus */
+        padding: 0.875rem !important;
+    }
+
+    /* Message container takes remaining space */
+    #ticket-messages {
+        flex: 1;
+        min-height: 0 !important;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+
+    /* Message bubbles - more compact on mobile */
+    #ticket-messages > div {
+        padding: 0.6rem !important;
+        margin-bottom: 0.5rem !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    /* Admin messages indented less on mobile */
+    #ticket-messages > div[style*="margin-left: 1rem"] {
+        margin-left: 0.5rem !important;
+    }
+
+    #ticket-messages > div[style*="margin-right: 1rem"] {
+        margin-right: 0.5rem !important;
+    }
+}
+
+/* Prevent pull-to-refresh when modal is open on mobile */
+body.modal-open {
+    overscroll-behavior: contain;
+    touch-action: none;
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+    @media (max-width: 640px) {
+        #ticket-modal .ticket-modal-content {
+            padding-bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
+            padding-left: calc(1rem + env(safe-area-inset-left)) !important;
+            padding-right: calc(1rem + env(safe-area-inset-right)) !important;
+        }
+
+        #ticket-reply-section {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    }
 }
