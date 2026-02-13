@@ -585,7 +585,11 @@ Full Ollama support is provided by merging any sharded GGUF output into a single
         loop = asyncio.get_event_loop()
         total, used, free = await loop.run_in_executor(None, shutil.disk_usage, CACHE_DIR)
         free_gb = free / (2**30)
-        
+
+        import logging
+        logger = logging.getLogger("GGUF_Forge")
+        logger.info(f"check_disk_space called: ignore_space_check={self.ignore_space_check}, required={required_gb:.1f}GB, available={free_gb:.1f}GB")
+
         if self.ignore_space_check:
             await self.log(f"  ⚠ Space check BYPASSED by admin (Available: {free_gb:.1f}GB)")
             await self.log(f"  ⚠ Original requirement was: {required_gb:.1f}GB")

@@ -218,6 +218,10 @@ async def terminate_model(model_id: str, user = Depends(get_admin)):
 @router.post("/models/{model_id}/continue")
 async def continue_model(model_id: str, background_tasks: BackgroundTasks, body: ContinueRequestBody = None, user = Depends(get_admin)):
     """Admin only: Continue an interrupted job."""
+    import logging
+    logger = logging.getLogger("GGUF_Forge")
+    logger.info(f"Continue request for {model_id}: body={body}, ignore_space_check={body.ignore_space_check if body else 'NO BODY'}")
+
     conn = await get_db_connection()
     await conn.execute("SELECT * FROM models WHERE id = ?", (model_id,))
     model = await conn.fetchone()
@@ -267,6 +271,8 @@ async def continue_model(model_id: str, background_tasks: BackgroundTasks, body:
         ignore_space_check = True
     elif model.get('ignore_space_check'):
         ignore_space_check = bool(model['ignore_space_check'])
+
+    logger.info(f"ignore_space_check determined: {ignore_space_check} (from body: {body.ignore_space_check if body else None}, from db: {model.get('ignore_space_check')})")
 
     # Get enable_shard_merging from stored value (default to True)
     enable_shard_merging = True
