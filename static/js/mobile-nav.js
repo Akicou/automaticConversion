@@ -18,7 +18,8 @@ class MobileNavManager {
 
     createHamburgerButton() {
         const navContent = document.querySelector('.nav-content');
-        if (!navContent) return;
+        const navLinks = document.querySelector('.nav-links');
+        if (!navContent || !navLinks) return;
 
         // Check if hamburger already exists
         if (document.querySelector('.hamburger-btn')) return;
@@ -34,7 +35,8 @@ class MobileNavManager {
         `;
 
         hamburger.addEventListener('click', () => this.toggleNav());
-        navContent.appendChild(hamburger);
+        // Insert before nav-links so it appears on the right side before the drawer
+        navContent.insertBefore(hamburger, navLinks);
     }
 
     setupEventListeners() {
