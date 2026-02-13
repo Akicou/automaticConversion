@@ -559,7 +559,9 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             completed_at DATETIME,
             completed_quants TEXT DEFAULT '',
-            ignore_space_check INTEGER DEFAULT 0
+            ignore_space_check INTEGER DEFAULT 0,
+            quants_to_run TEXT DEFAULT '',
+            enable_shard_merging INTEGER DEFAULT 1
         )
     ''')
     
@@ -572,6 +574,18 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
     # Migration: Add ignore_space_check column if it doesn't exist
     try:
         await conn.execute("ALTER TABLE models ADD COLUMN ignore_space_check INTEGER DEFAULT 0")
+    except:
+        pass  # Column already exists
+
+    # Migration: Add quants_to_run column if it doesn't exist
+    try:
+        await conn.execute("ALTER TABLE models ADD COLUMN quants_to_run TEXT DEFAULT ''")
+    except:
+        pass  # Column already exists
+
+    # Migration: Add enable_shard_merging column if it doesn't exist
+    try:
+        await conn.execute("ALTER TABLE models ADD COLUMN enable_shard_merging INTEGER DEFAULT 1")
     except:
         pass  # Column already exists
     
@@ -648,6 +662,20 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
         )
     ''')
 
+    # Quant priority table for admin-configurable quantization order
+    await conn.execute('''
+        CREATE TABLE IF NOT EXISTS quant_priority (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            priority_order TEXT DEFAULT '',
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Initialize default quant priority if not exists
+    await conn.execute('''
+        INSERT OR IGNORE INTO quant_priority (id, priority_order) VALUES (1, '')
+    ''')
+
     # Performance indexes for frequently queried columns
     await conn.execute('CREATE INDEX IF NOT EXISTS idx_models_status ON models(status)')
     await conn.execute('CREATE INDEX IF NOT EXISTS idx_models_hf_repo_id ON models(hf_repo_id)')
@@ -691,7 +719,9 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
             created_at DATETIME DEFAULT GETDATE(),
             completed_at DATETIME,
             completed_quants NVARCHAR(MAX) DEFAULT '',
-            ignore_space_check BIT DEFAULT 0
+            ignore_space_check BIT DEFAULT 0,
+            quants_to_run NVARCHAR(MAX) DEFAULT '',
+            enable_shard_merging BIT DEFAULT 1
         )
     ''')
     await conn.commit()
@@ -711,6 +741,26 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
         await conn.execute('''
             IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'ignore_space_check')
             ALTER TABLE models ADD ignore_space_check BIT DEFAULT 0
+        ''')
+        await conn.commit()
+    except:
+        pass
+
+    # Migration: Add quants_to_run column if it doesn't exist
+    try:
+        await conn.execute('''
+            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'quants_to_run')
+            ALTER TABLE models ADD quants_to_run NVARCHAR(MAX) DEFAULT ''
+        ''')
+        await conn.commit()
+    except:
+        pass
+
+    # Migration: Add enable_shard_merging column if it doesn't exist
+    try:
+        await conn.execute('''
+            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'enable_shard_merging')
+            ALTER TABLE models ADD enable_shard_merging BIT DEFAULT 1
         ''')
         await conn.commit()
     except:
@@ -816,6 +866,27 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
         )
     ''')
     await conn.commit()
+
+    # Quant priority table for admin-configurable quantization order
+    await conn.execute('''
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='quant_priority' AND xtype='U')
+        CREATE TABLE quant_priority (
+            id INT PRIMARY KEY CHECK (id = 1),
+            priority_order NVARCHAR(MAX) DEFAULT '',
+            updated_at DATETIME DEFAULT GETDATE()
+        )
+    ''')
+    await conn.commit()
+
+    # Initialize default quant priority if not exists
+    try:
+        await conn.execute('''
+            IF NOT EXISTS (SELECT * FROM quant_priority WHERE id = 1)
+            INSERT INTO quant_priority (id, priority_order) VALUES (1, '')
+        ''')
+        await conn.commit()
+    except:
+        pass
 
     # Performance indexes for frequently queried columns
     index_queries = [

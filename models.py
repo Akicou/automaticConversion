@@ -39,3 +39,8 @@ class TicketMessage(BaseModel):
 class CreateTicketRequest(BaseModel):
     request_id: int
     initial_message: Optional[str] = ""
+
+
+class ContinueRequestBody(BaseModel):
+    """Admin options when continuing an interrupted job."""
+    ignore_space_check: Optional[bool] = False  # If True, bypass conservative disk space checks

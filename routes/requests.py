@@ -196,10 +196,10 @@ async def approve_request(
         log_msg += "\n⚠ Admin override: Space check disabled"
     if not enable_shard_merging:
         log_msg += "\n⚠ Admin override: Shard merging disabled"
-    
+
     await conn.execute(
-        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, ignore_space_check) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (new_id, hf_repo_id, "pending", 0, log_msg, "", 1 if ignore_space_check else 0)
+        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, ignore_space_check, quants_to_run, enable_shard_merging) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (new_id, hf_repo_id, "pending", 0, log_msg, "", 1 if ignore_space_check else 0, json.dumps(approved_quants), 1 if enable_shard_merging else 0)
     )
     await conn.commit()
     await conn.close()

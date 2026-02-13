@@ -9,7 +9,7 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 
 from database import get_db_connection
-from models import ProcessRequest
+from models import ProcessRequest, ContinueRequestBody
 from workflow import ModelWorkflow, running_workflows, get_quants_list, get_model_queue
 from managers import HuggingFaceManager, LlamaCppManager
 
@@ -128,8 +128,8 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
     
     quants_msg = ', '.join(quants_to_run) if len(quants_to_run) < len(available_quants) else 'all quants'
     await conn.execute(
-        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details) VALUES (?, ?, ?, ?, ?, ?)",
-        (new_id, req.model_id, "pending", 0, f"Queued... Quants: {quants_msg}", "")
+        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, quants_to_run) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (new_id, req.model_id, "pending", 0, f"Queued... Quants: {quants_msg}", "", json.dumps(quants_to_run))
     )
     await conn.commit()
     await conn.close()
@@ -216,26 +216,26 @@ async def terminate_model(model_id: str, user = Depends(get_admin)):
 
 
 @router.post("/models/{model_id}/continue")
-async def continue_model(model_id: str, background_tasks: BackgroundTasks, user = Depends(get_admin)):
+async def continue_model(model_id: str, background_tasks: BackgroundTasks, body: ContinueRequestBody = None, user = Depends(get_admin)):
     """Admin only: Continue an interrupted job."""
     conn = await get_db_connection()
     await conn.execute("SELECT * FROM models WHERE id = ?", (model_id,))
     model = await conn.fetchone()
-    
+
     if not model:
         await conn.close()
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     # Only allow continuing interrupted jobs
     if model['status'] != 'interrupted':
         await conn.close()
         raise HTTPException(status_code=400, detail=f"Can only continue interrupted jobs. Current status: {model['status']}")
-    
+
     # Check if job is already running
     if model_id in running_workflows:
         await conn.close()
         raise HTTPException(status_code=400, detail="Job is already running")
-    
+
     # Get the list of completed quants
     completed_quants = []
     if model.get('completed_quants'):
@@ -243,31 +243,60 @@ async def continue_model(model_id: str, background_tasks: BackgroundTasks, user 
             completed_quants = json.loads(model['completed_quants'])
         except (json.JSONDecodeError, TypeError):
             completed_quants = []
-    
-    # Calculate remaining quants
-    all_quants = get_quants_list()
-    remaining_quants = [q for q in all_quants if q not in completed_quants]
-    
+
+    # Get the original quants_to_run if stored, otherwise use all quants
+    quants_to_run = get_quants_list()
+    if model.get('quants_to_run'):
+        try:
+            stored_quants = json.loads(model['quants_to_run'])
+            if stored_quants:
+                quants_to_run = stored_quants
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # Calculate remaining quants based on the original quants_to_run
+    remaining_quants = [q for q in quants_to_run if q not in completed_quants]
+
     if not remaining_quants:
         await conn.close()
         raise HTTPException(status_code=400, detail="All quants already completed for this job")
-    
+
+    # Get ignore_space_check from body or stored value
+    ignore_space_check = False
+    if body and body.ignore_space_check:
+        ignore_space_check = True
+    elif model.get('ignore_space_check'):
+        ignore_space_check = bool(model['ignore_space_check'])
+
+    # Get enable_shard_merging from stored value (default to True)
+    enable_shard_merging = True
+    if model.get('enable_shard_merging') is not None:
+        enable_shard_merging = bool(model['enable_shard_merging'])
+
+    # Build log message
+    log_msg = model['log'] + "\n\n━━━ RESUMING JOB ━━━\n"
+    if ignore_space_check:
+        log_msg += "⚠ Admin override: Space check disabled\n"
+
     # Reset status and clear error
     await conn.execute(
-        "UPDATE models SET status = ?, error_details = ?, log = ? WHERE id = ?",
-        ("pending", "", model['log'] + "\n\n━━━ RESUMING JOB ━━━\n", model_id)
+        "UPDATE models SET status = ?, error_details = ?, log = ?, ignore_space_check = ? WHERE id = ?",
+        ("pending", "", log_msg, 1 if ignore_space_check else 0, model_id)
     )
     await conn.commit()
     await conn.close()
-    
+
     # Start the workflow in resume mode
     workflow = ModelWorkflow(
-        model_id, 
-        model['hf_repo_id'], 
+        model_id,
+        model['hf_repo_id'],
         resume_mode=True,
-        completed_quants=completed_quants
+        completed_quants=completed_quants,
+        quants_to_run=quants_to_run,
+        ignore_space_check=ignore_space_check,
+        enable_shard_merging=enable_shard_merging
     )
-    
+
     # Add to queue instead of running directly
     queue = get_model_queue()
     if queue:
@@ -275,12 +304,13 @@ async def continue_model(model_id: str, background_tasks: BackgroundTasks, user 
     else:
         # Fallback to direct execution if queue not initialized
         background_tasks.add_task(workflow.run_pipeline)
-    
+
     return {
-        "status": "queued", 
+        "status": "queued",
         "message": f"Job resumed and added to queue. {len(completed_quants)} quants already done, {len(remaining_quants)} remaining.",
         "completed": completed_quants,
-        "remaining": remaining_quants
+        "remaining": remaining_quants,
+        "ignore_space_check": ignore_space_check
     }
 
 

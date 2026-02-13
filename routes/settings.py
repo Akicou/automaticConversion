@@ -2,14 +2,31 @@
 User Settings Routes
 Handles user preferences and settings management
 """
-
-from fastapi import APIRouter, Depends
+import json
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, List
 
 from database import get_db_connection
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+# Admin dependency - will be set by main app
+_require_admin_func = None
+
+
+def configure(admin_dep):
+    """Configure routes with dependencies."""
+    global _require_admin_func
+    _require_admin_func = admin_dep
+
+
+async def get_admin(request: Request):
+    """Dependency that uses the configured admin check."""
+    if _require_admin_func:
+        return await _require_admin_func(request)
+    raise HTTPException(status_code=500, detail="Admin dependency not configured")
 
 
 class SettingsUpdate(BaseModel):
@@ -111,3 +128,93 @@ async def get_available_quants():
     """Get list of available quantization types."""
     from workflow import get_quants_list
     return {"quants": get_quants_list()}
+
+
+class QuantPriorityUpdate(BaseModel):
+    priority_order: List[str]  # Ordered list of quant types (e.g., ["Q4_K_M", "Q5_K_M", ...])
+
+
+@router.get("/quant-priority")
+async def get_quant_priority():
+    """Get the current quant priority order. Returns default order if not configured."""
+    from workflow import get_quants_list
+
+    conn = await get_db_connection()
+    await conn.execute("SELECT priority_order FROM quant_priority WHERE id = 1")
+    row = await conn.fetchone()
+    await conn.close()
+
+    default_quants = get_quants_list()
+
+    if row and row.get('priority_order'):
+        try:
+            custom_order = json.loads(row['priority_order'])
+            # Validate that all quants in custom order are valid
+            valid_order = [q for q in custom_order if q in default_quants]
+            # Add any missing quants at the end
+            missing = [q for q in default_quants if q not in valid_order]
+            return {
+                "priority_order": valid_order + missing,
+                "is_custom": len(valid_order) > 0,
+                "default_order": default_quants
+            }
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    return {
+        "priority_order": default_quants,
+        "is_custom": False,
+        "default_order": default_quants
+    }
+
+
+@router.post("/quant-priority")
+async def set_quant_priority(request: Request, body: QuantPriorityUpdate):
+    """Admin only: Set the quant priority order."""
+    await get_admin(request)
+
+    from workflow import get_quants_list
+
+    available_quants = get_quants_list()
+
+    # Validate all quants in the priority order
+    for q in body.priority_order:
+        if q not in available_quants:
+            raise HTTPException(status_code=400, detail=f"Invalid quant type: {q}")
+
+    # Check for duplicates
+    if len(body.priority_order) != len(set(body.priority_order)):
+        raise HTTPException(status_code=400, detail="Duplicate quant types in priority order")
+
+    conn = await get_db_connection()
+    await conn.execute(
+        "UPDATE quant_priority SET priority_order = ?, updated_at = ? WHERE id = 1",
+        (json.dumps(body.priority_order), datetime.now())
+    )
+    await conn.commit()
+    await conn.close()
+
+    return {
+        "status": "updated",
+        "priority_order": body.priority_order
+    }
+
+
+@router.post("/quant-priority/reset")
+async def reset_quant_priority(request: Request):
+    """Admin only: Reset quant priority to default order."""
+    await get_admin(request)
+
+    conn = await get_db_connection()
+    await conn.execute(
+        "UPDATE quant_priority SET priority_order = '', updated_at = ? WHERE id = 1",
+        (datetime.now(),)
+    )
+    await conn.commit()
+    await conn.close()
+
+    from workflow import get_quants_list
+    return {
+        "status": "reset",
+        "priority_order": get_quants_list()
+    }

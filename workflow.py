@@ -47,6 +47,32 @@ def get_quants_list():
     return QUANTS
 
 
+async def get_quant_priority_order():
+    """Get the priority order for quants from database. Returns default if not configured."""
+    from database import get_db_connection
+
+    try:
+        conn = await get_db_connection()
+        await conn.execute("SELECT priority_order FROM quant_priority WHERE id = 1")
+        row = await conn.fetchone()
+        await conn.close()
+
+        if row and row.get('priority_order'):
+            try:
+                custom_order = json.loads(row['priority_order'])
+                # Validate and filter
+                valid_order = [q for q in custom_order if q in QUANTS]
+                # Add missing quants at the end
+                missing = [q for q in QUANTS if q not in valid_order]
+                return valid_order + missing
+            except (json.JSONDecodeError, TypeError):
+                pass
+    except Exception:
+        pass
+
+    return list(QUANTS)
+
+
 class ModelQueue:
     """Queue system to process one model at a time.
     
@@ -655,129 +681,142 @@ Full Ollama support is provided by merging any sharded GGUF output into a single
             await self.progress(10)
             await self.log("")
 
-            # 2. Download
-            self.check_terminated()
-            self.start_step("download")
-            await self.status("downloading")
-            await self.log("▶ STEP 2: Downloading model from HuggingFace...")
-            await self.log(f"  Source: https://huggingface.co/{self.hf_repo_id}")
-            
-            # Get actual model size and calculate required space
-            model_size_gb = await self.get_model_size_gb()
-            await self.log(f"  Model size: {model_size_gb:.2f}GB")
-            required_gb = max(5.0, model_size_gb * 3)
-            await self.check_disk_space(required_gb)
-            
-            # Clear any previous transfer progress
-            self.clear_transfer_progress()
-            
-            # Get list of files to download
-            api = HfApi()
-            loop = asyncio.get_event_loop()
-            try:
-                repo_files = await loop.run_in_executor(
-                    None,
-                    lambda: api.list_repo_files(self.hf_repo_id)
-                )
-                # Filter for model files (safetensors, bin, json, etc.)
-                download_files = [f for f in repo_files if any(f.endswith(ext) for ext in 
-                    ['.safetensors', '.bin', '.pt', '.pth', '.json', '.txt', '.model', '.tiktoken', '.py'])]
-                
-                await self.log(f"  Found {len(download_files)} files to download")
-                
-                # Download files with progress tracking
-                local_dir = CACHE_DIR / self.hf_repo_id
-                local_dir.mkdir(parents=True, exist_ok=True)
-                
-                total_files = len(download_files)
-                for idx, filename in enumerate(download_files):
-                    self.check_terminated()
-                    short_name = filename.split('/')[-1] if '/' in filename else filename
-                    
-                    # Initialize progress for this file
-                    await self.update_transfer_progress(short_name, 0, "", "Starting...", "download")
-                    
-                    # Download file in thread pool
-                    try:
-                        await loop.run_in_executor(
-                            None,
-                            lambda f=filename: hf_hub_download(
-                                repo_id=self.hf_repo_id,
-                                filename=f,
-                                local_dir=local_dir,
-                                local_dir_use_symlinks=False
-                            )
-                        )
-                        # Mark as complete
-                        await self.update_transfer_progress(short_name, 100, "", "Complete", "download")
-                    except Exception as e:
-                        await self.log(f"  ⚠ Failed to download {short_name}: {e}")
-                        await self.update_transfer_progress(short_name, -1, "", "Failed", "download")
-                    
-                    # Update overall progress (10-30% for download step)
-                    step_progress = 10 + int((idx + 1) / total_files * 20)
-                    await self.progress(step_progress)
-                
-                self.model_dir = str(local_dir)
-                
-            except Exception as e:
-                # Fallback to snapshot_download if file listing fails
-                await self.log(f"  Using batch download...")
-                self.model_dir = await loop.run_in_executor(
-                    None,
-                    lambda: snapshot_download(
-                        repo_id=self.hf_repo_id, 
-                        local_dir=CACHE_DIR / self.hf_repo_id, 
-                        local_dir_use_symlinks=False
-                    )
-                )
-            
-            # Clear download progress display
-            self.clear_transfer_progress()
-            await broadcast_transfer_progress(self.model_id, "download", [])
-            
-            await self.log(f"  ✓ Downloaded to {self.model_dir}")
-            self.end_step("download")
-            await self.progress(30)
-            await self.log("")
-
-            # 3. Convert to FP16
-            self.check_terminated()
-            self.start_step("convert")
-            await self.status("converting")
-            await self.log("▶ STEP 3: Converting to GGUF format (FP16)...")
-            convert_script = LLAMA_CPP_DIR / "convert_hf_to_gguf.py"
+            # Check if FP16 file already exists (crash recovery)
             self.fp16_path = CACHE_DIR / f"{self.hf_repo_id.replace('/', '-')}-f16.gguf"
-            
-            cmd = [sys.executable, str(convert_script), str(self.model_dir), "--outfile", str(self.fp16_path), "--outtype", "f16"]
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT
-            )
-            self.running_processes.append(process)
-            
-            async for line in process.stdout:
-                decoded = line.decode().strip()
-                if decoded:
-                    await self.log(f"  {decoded}")
-            
-            returncode = await process.wait()
-            try:
-                self.running_processes.remove(process)
-            except ValueError:
-                pass
-            
-            if returncode != 0:
-                raise Exception("Conversion to GGUF failed. Check logs for details.")
-            
-            await self.log(f"  ✓ FP16 conversion complete: {self.fp16_path.name}")
-            self.end_step("convert")
-            await self.progress(50)
-            
-            # Clean up safetensors immediately - only the GGUF file is needed for quantization
-            await self.cleanup_safetensors()
-            await self.log("")
+            fp16_exists = self.fp16_path.exists() and self.fp16_path.stat().st_size > 0
+
+            # 2. Download (skip if FP16 already exists)
+            self.check_terminated()
+            if fp16_exists and self.resume_mode:
+                await self.log("▶ STEP 2: Download SKIPPED (FP16 file exists from previous run)")
+                await self.log(f"  ✓ Using existing FP16 file: {self.fp16_path.name}")
+                await self.log("")
+            else:
+                self.start_step("download")
+                await self.status("downloading")
+                await self.log("▶ STEP 2: Downloading model from HuggingFace...")
+                await self.log(f"  Source: https://huggingface.co/{self.hf_repo_id}")
+
+                # Get actual model size and calculate required space
+                model_size_gb = await self.get_model_size_gb()
+                await self.log(f"  Model size: {model_size_gb:.2f}GB")
+                required_gb = max(5.0, model_size_gb * 3)
+                await self.check_disk_space(required_gb)
+
+                # Clear any previous transfer progress
+                self.clear_transfer_progress()
+
+                # Get list of files to download
+                api = HfApi()
+                loop = asyncio.get_event_loop()
+                try:
+                    repo_files = await loop.run_in_executor(
+                        None,
+                        lambda: api.list_repo_files(self.hf_repo_id)
+                    )
+                    # Filter for model files (safetensors, bin, json, etc.)
+                    download_files = [f for f in repo_files if any(f.endswith(ext) for ext in
+                        ['.safetensors', '.bin', '.pt', '.pth', '.json', '.txt', '.model', '.tiktoken', '.py'])]
+
+                    await self.log(f"  Found {len(download_files)} files to download")
+
+                    # Download files with progress tracking
+                    local_dir = CACHE_DIR / self.hf_repo_id
+                    local_dir.mkdir(parents=True, exist_ok=True)
+
+                    total_files = len(download_files)
+                    for idx, filename in enumerate(download_files):
+                        self.check_terminated()
+                        short_name = filename.split('/')[-1] if '/' in filename else filename
+
+                        # Initialize progress for this file
+                        await self.update_transfer_progress(short_name, 0, "", "Starting...", "download")
+
+                        # Download file in thread pool
+                        try:
+                            await loop.run_in_executor(
+                                None,
+                                lambda f=filename: hf_hub_download(
+                                    repo_id=self.hf_repo_id,
+                                    filename=f,
+                                    local_dir=local_dir,
+                                    local_dir_use_symlinks=False
+                                )
+                            )
+                            # Mark as complete
+                            await self.update_transfer_progress(short_name, 100, "", "Complete", "download")
+                        except Exception as e:
+                            await self.log(f"  ⚠ Failed to download {short_name}: {e}")
+                            await self.update_transfer_progress(short_name, -1, "", "Failed", "download")
+
+                        # Update overall progress (10-30% for download step)
+                        step_progress = 10 + int((idx + 1) / total_files * 20)
+                        await self.progress(step_progress)
+
+                    self.model_dir = str(local_dir)
+
+                except Exception as e:
+                    # Fallback to snapshot_download if file listing fails
+                    await self.log(f"  Using batch download...")
+                    self.model_dir = await loop.run_in_executor(
+                        None,
+                        lambda: snapshot_download(
+                            repo_id=self.hf_repo_id,
+                            local_dir=CACHE_DIR / self.hf_repo_id,
+                            local_dir_use_symlinks=False
+                        )
+                    )
+
+                # Clear download progress display
+                self.clear_transfer_progress()
+                await broadcast_transfer_progress(self.model_id, "download", [])
+
+                await self.log(f"  ✓ Downloaded to {self.model_dir}")
+                self.end_step("download")
+                await self.progress(30)
+                await self.log("")
+
+            # 3. Convert to FP16 (skip if FP16 already exists)
+            self.check_terminated()
+            if fp16_exists and self.resume_mode:
+                await self.log("▶ STEP 3: Conversion SKIPPED (FP16 file exists from previous run)")
+                await self.log(f"  ✓ Using existing FP16 file: {self.fp16_path.name}")
+                await self.log("")
+            else:
+                self.start_step("convert")
+                await self.status("converting")
+                await self.log("▶ STEP 3: Converting to GGUF format (FP16)...")
+                convert_script = LLAMA_CPP_DIR / "convert_hf_to_gguf.py"
+
+                cmd = [sys.executable, str(convert_script), str(self.model_dir), "--outfile", str(self.fp16_path), "--outtype", "f16"]
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT
+                )
+                self.running_processes.append(process)
+
+                async for line in process.stdout:
+                    decoded = line.decode().strip()
+                    if decoded:
+                        await self.log(f"  {decoded}")
+
+                returncode = await process.wait()
+                try:
+                    self.running_processes.remove(process)
+                except ValueError:
+                    pass
+
+                if returncode != 0:
+                    raise Exception("Conversion to GGUF failed. Check logs for details.")
+
+                await self.log(f"  ✓ FP16 conversion complete: {self.fp16_path.name}")
+                self.end_step("convert")
+                await self.progress(50)
+
+                # Clean up safetensors immediately - only the GGUF file is needed for quantization
+                await self.cleanup_safetensors()
+                await self.log("")
 
             # 4. Quantize and Upload (each quant is uploaded immediately after creation, then deleted)
             self.check_terminated()
@@ -811,10 +850,17 @@ Full Ollama support is provided by merging any sharded GGUF output into a single
 
             await self.log("")
             uploaded_files = []  # List of quant types that were uploaded
-            
+
             # Determine which quants to process (use custom list if set, skip already completed ones)
             quants_to_process = [q for q in self.quants_to_run if q not in self.completed_quants]
-            
+
+            # Sort quants by priority order
+            priority_order = await get_quant_priority_order()
+            priority_map = {q: i for i, q in enumerate(priority_order)}
+            quants_to_process.sort(key=lambda q: priority_map.get(q, 999))
+
+            await self.log(f"  Quant priority order: {', '.join(quants_to_process)}")
+
             if self.resume_mode and self.completed_quants:
                 await self.log(f"  📋 Resume mode: {len(self.completed_quants)} quants already completed")
                 await self.log(f"     Already done: {', '.join(self.completed_quants)}")

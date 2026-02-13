@@ -349,6 +349,7 @@ auth.configure(templates, pwd_context, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAU
 models.configure(require_admin)
 requests.configure(require_admin, get_current_user, spam_protection)
 tickets.configure(require_admin, get_current_user)
+settings.configure(require_admin)
 
 # Include routers
 app.include_router(auth.router)
