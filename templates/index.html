@@ -446,6 +446,11 @@
         style="margin-bottom: 1.5rem; display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
         <div id="queue-status" style="font-size: 0.75rem; color: var(--text-secondary);"></div>
         <div id="llama-update-status" style="font-size: 0.75rem; color: var(--text-secondary);"></div>
+        <button id="quant-priority-btn" onclick="toggleQuantPriority()"
+            style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
+            <span>📊</span>
+            <span>Quant Priority</span>
+        </button>
         <button id="update-llama-btn" onclick="updateLlamaCpp()"
             style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
             <span id="llama-btn-icon">🔧</span>
@@ -457,6 +462,29 @@
             <span id="update-btn-icon">🔄</span>
             <span id="update-btn-text">Check for updates...</span>
         </button>
+    </div>
+
+    <!-- Quant Priority Panel (Admin only) -->
+    <div id="quant-priority-panel" style="display: none; margin-bottom: 1.5rem;" class="glass-panel">
+        <div style="padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-size: 1rem; font-weight: 500;">Quantization Priority Order</h3>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button onclick="resetQuantPriority()" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Reset to Default</button>
+                    <button onclick="toggleQuantPriority()" style="background: transparent; border: 1px solid var(--error); color: var(--error); padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Close</button>
+                </div>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                Drag to reorder. Quants at the top are processed first. This affects all new conversions.
+            </p>
+            <div id="quant-priority-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <!-- Populated by JavaScript -->
+            </div>
+            <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                <button onclick="saveQuantPriority()" class="primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Save Order</button>
+                <span id="quant-priority-status" style="font-size: 0.8rem; color: var(--success); display: none;">Saved!</span>
+            </div>
+        </div>
     </div>
     {% endif %}
 
@@ -968,6 +996,160 @@
             cb.checked = quants.includes(cb.value);
         });
         updateQuantCount();
+    }
+
+    // ====== QUANT PRIORITY (Admin only) ======
+    let quantPriorityOrder = [];
+    let draggedQuantItem = null;
+
+    async function loadQuantPriority() {
+        if (!isAdmin) return;
+        try {
+            const res = await fetch('/api/settings/quant-priority');
+            const data = await res.json();
+            quantPriorityOrder = data.priority_order || [];
+            renderQuantPriorityList();
+        } catch (e) {
+            console.error('Failed to load quant priority:', e);
+        }
+    }
+
+    function renderQuantPriorityList() {
+        const list = document.getElementById('quant-priority-list');
+        if (!list) return;
+
+        list.innerHTML = quantPriorityOrder.map((quant, index) => `
+            <div class="quant-priority-item" draggable="true" data-quant="${quant}"
+                style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 6px; cursor: grab; transition: all 0.2s;">
+                <span style="color: var(--text-secondary); font-size: 0.75rem; width: 1.5rem;">#${index + 1}</span>
+                <span style="flex: 1; font-family: monospace; font-size: 0.85rem;">${quant}</span>
+                <span style="color: var(--text-secondary); font-size: 0.7rem;">☰</span>
+            </div>
+        `).join('');
+
+        // Add drag event listeners
+        list.querySelectorAll('.quant-priority-item').forEach(item => {
+            item.addEventListener('dragstart', handleDragStart);
+            item.addEventListener('dragend', handleDragEnd);
+            item.addEventListener('dragover', handleDragOver);
+            item.addEventListener('drop', handleDrop);
+            item.addEventListener('dragenter', handleDragEnter);
+            item.addEventListener('dragleave', handleDragLeave);
+        });
+    }
+
+    function handleDragStart(e) {
+        draggedQuantItem = this;
+        this.style.opacity = '0.5';
+        this.style.cursor = 'grabbing';
+    }
+
+    function handleDragEnd(e) {
+        this.style.opacity = '1';
+        this.style.cursor = 'grab';
+        document.querySelectorAll('.quant-priority-item').forEach(item => {
+            item.style.borderTop = '';
+            item.style.borderBottom = '';
+        });
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+    }
+
+    function handleDragEnter(e) {
+        e.preventDefault();
+        if (this !== draggedQuantItem) {
+            const rect = this.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            if (e.clientY < midY) {
+                this.style.borderTop = '2px solid var(--accent-primary)';
+                this.style.borderBottom = '';
+            } else {
+                this.style.borderTop = '';
+                this.style.borderBottom = '2px solid var(--accent-primary)';
+            }
+        }
+    }
+
+    function handleDragLeave(e) {
+        this.style.borderTop = '';
+        this.style.borderBottom = '';
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        if (this !== draggedQuantItem) {
+            const draggedQuant = draggedQuantItem.dataset.quant;
+            const targetQuant = this.dataset.quant;
+
+            const draggedIndex = quantPriorityOrder.indexOf(draggedQuant);
+            const targetIndex = quantPriorityOrder.indexOf(targetQuant);
+
+            // Remove dragged item
+            quantPriorityOrder.splice(draggedIndex, 1);
+
+            // Determine insert position based on drop location
+            const rect = this.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            const insertIndex = e.clientY < midY ? targetIndex : targetIndex + 1;
+
+            // Insert at new position
+            quantPriorityOrder.splice(insertIndex, 0, draggedQuant);
+
+            renderQuantPriorityList();
+        }
+        this.style.borderTop = '';
+        this.style.borderBottom = '';
+    }
+
+    function toggleQuantPriority() {
+        const panel = document.getElementById('quant-priority-panel');
+        if (panel.style.display === 'none') {
+            panel.style.display = 'block';
+            loadQuantPriority();
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    async function saveQuantPriority() {
+        try {
+            const res = await fetch('/api/settings/quant-priority', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ priority_order: quantPriorityOrder })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                const status = document.getElementById('quant-priority-status');
+                status.style.display = 'inline';
+                setTimeout(() => { status.style.display = 'none'; }, 2000);
+                showToast('success', 'Quant priority order saved');
+            } else {
+                showToast('error', 'Failed to save: ' + (data.detail || 'Unknown error'));
+            }
+        } catch (e) {
+            showToast('error', 'Failed to save quant priority');
+        }
+    }
+
+    async function resetQuantPriority() {
+        try {
+            const res = await fetch('/api/settings/quant-priority/reset', {
+                method: 'POST'
+            });
+            const data = await res.json();
+            if (res.ok) {
+                quantPriorityOrder = data.priority_order;
+                renderQuantPriorityList();
+                showToast('success', 'Quant priority reset to default');
+            } else {
+                showToast('error', 'Failed to reset');
+            }
+        } catch (e) {
+            showToast('error', 'Failed to reset quant priority');
+        }
     }
 
     function updateQuantCount() {
