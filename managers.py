@@ -157,6 +157,41 @@ class LlamaCppManager:
                 return data.decode('utf-8', errors='replace')
 
     @staticmethod
+    def _get_vs_env() -> dict:
+        """Get Visual Studio environment variables for building."""
+        # Common paths for VS Developer Command Prompt
+        vs_where = r"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+        vcvars_paths = [
+            r"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat",
+            r"C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat",
+            r"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat",
+            r"C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat",
+        ]
+
+        for vcvars in vcvars_paths:
+            if Path(vcvars).exists():
+                logger.info(f"Found VS environment: {vcvars}")
+                # Run vcvars and capture environment
+                try:
+                    result = subprocess.run(
+                        f'cmd /c ""{vcvars}" && set"',
+                        capture_output=True,
+                        shell=True,
+                        text=True
+                    )
+                    if result.returncode == 0:
+                        env = os.environ.copy()
+                        for line in result.stdout.splitlines():
+                            if '=' in line:
+                                key, _, value = line.partition('=')
+                                env[key] = value
+                        return env
+                except Exception as e:
+                    logger.warning(f"Failed to get VS env from {vcvars}: {e}")
+
+        return os.environ.copy()
+
+    @staticmethod
     async def build():
         """Build llama.cpp using CMake with optional CUDA support."""
         logger.info("Building llama.cpp...")
@@ -199,17 +234,18 @@ class LlamaCppManager:
                 "cmake", "..",
                 "-DGGML_CUDA=OFF" if not has_cuda else "-DGGML_CUDA=ON",
                 "-DCMAKE_BUILD_TYPE=Release",
-                "-DGGML_NATIVE=OFF",  # Disable native optimizations for broader compatibility
+                "-DGGML_NATIVE=OFF",
             ]
 
             # Platform-specific CMake generator and settings
             if system == "Windows":
-                # Try different generators in order of preference
+                # Get Visual Studio environment
+                build_env = LlamaCppManager._get_vs_env()
+
+                # Try Visual Studio generators first (they work best with proper env)
                 generators = [
                     ("Visual Studio 17 2022", "x64"),
                     ("Visual Studio 16 2019", "x64"),
-                    ("MinGW Makefiles", None),
-                    ("NMake Makefiles", None),
                 ]
 
                 cmake_success = False
@@ -227,7 +263,7 @@ class LlamaCppManager:
                         cwd=build_dir,
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.STDOUT,
-                        env={**os.environ, "CMAKE_GENERATOR": generator}
+                        env=build_env
                     )
                     stdout, _ = await proc.communicate()
 
@@ -247,7 +283,8 @@ class LlamaCppManager:
                     raise Exception(f"CMake configure failed with all generators. Last error:\n{last_error[:2000]}")
             else:
                 # Linux/macOS - simpler approach
-                cmake_args.extend(["-DGGML_BLAS=OFF"])  # Disable BLAS for simpler builds
+                build_env = os.environ.copy()
+                cmake_args.extend(["-DGGML_BLAS=OFF"])
 
                 logger.info(f"Running CMake configure: {' '.join(cmake_args)}")
 
@@ -274,7 +311,7 @@ class LlamaCppManager:
             cores = multiprocessing.cpu_count()
 
             if system == "Windows":
-                build_args.extend(["--", "/m"])  # Parallel build for MSBuild
+                build_args.extend(["--", "/m"])
             else:
                 build_args.extend(["-j", str(cores)])
 
@@ -284,7 +321,8 @@ class LlamaCppManager:
                 *build_args,
                 cwd=build_dir,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT
+                stderr=asyncio.subprocess.STDOUT,
+                env=build_env
             )
             stdout, _ = await proc.communicate()
 
