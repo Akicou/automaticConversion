@@ -174,10 +174,14 @@ async def approve_request(
             approved_quants = available_quants
     
     approved_quants_json = json.dumps(approved_quants)
-    
+
     # Get admin options from request body
     ignore_space_check = body.ignore_space_check if body and body.ignore_space_check else False
     enable_shard_merging = body.enable_shard_merging if body and hasattr(body, 'enable_shard_merging') else True
+
+    import logging
+    logger = logging.getLogger("GGUF_Forge")
+    logger.info(f"Approve request: body={body}, ignore_space_check={ignore_space_check}, enable_shard_merging={enable_shard_merging}")
     
     # Update request status and approved quants
     await conn.execute(

@@ -1963,11 +1963,10 @@ async function requestModel() {
             };
 
             clone.querySelector('.approve-btn').onclick = async () => {
-                const cardEl = container.querySelector(`.request-card[data-request-id="${req.id}"]`);
-                const checkedBoxes = cardEl.querySelectorAll('.req-quant-cb:checked');
+                const checkedBoxes = clone.querySelectorAll('.req-quant-cb:checked');
                 const approvedQuants = Array.from(checkedBoxes).map(cb => cb.value);
-                const ignoreSpaceCheck = cardEl.querySelector('.ignore-space-check').checked;
-                const enableShardMerging = cardEl.querySelector('.enable-shard-merge').checked;
+                const ignoreSpaceCheck = clone.querySelector('.ignore-space-check').checked;
+                const enableShardMerging = clone.querySelector('.enable-shard-merge').checked;
 
                 if (approvedQuants.length === 0) {
                     showToast('warning', 'Please select at least one quant type to generate.');
