@@ -610,6 +610,10 @@
             </div>
             <div class="model-card-actions" style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
                 <span class="status-badge">Status</span>
+                <label class="continue-ignore-space" style="display: none; align-items: center; gap: 0.3rem; font-size: 0.65rem; color: var(--text-secondary); cursor: pointer;">
+                    <input type="checkbox" class="ignore-space-checkbox" style="accent-color: #ff8c00; cursor: pointer; width: 12px; height: 12px;">
+                    <span title="Bypass disk space check (advanced)">⚠ Space</span>
+                </label>
                 <button class="continue-btn"
                     style="display: none; background: var(--success); color: #000; border: none; padding: 0.35rem 0.65rem; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 600;">Continue</button>
                 <button class="terminate-btn"
@@ -1729,11 +1733,15 @@ async function requestModel() {
                 const deleteBtn = card.querySelector('.delete-btn');
                 const terminateBtn = card.querySelector('.terminate-btn');
                 const continueBtn = card.querySelector('.continue-btn');
+                const continueIgnoreSpace = card.querySelector('.continue-ignore-space');
 
                 // Update click handlers
                 deleteBtn.onclick = () => deleteModel(model.id, model.hf_repo_id);
                 terminateBtn.onclick = () => terminateModel(model.id, model.hf_repo_id);
-                continueBtn.onclick = () => continueModel(model.id, model.hf_repo_id);
+                continueBtn.onclick = () => {
+                    const ignoreSpaceCheck = continueIgnoreSpace.querySelector('.ignore-space-checkbox').checked;
+                    continueModel(model.id, model.hf_repo_id, ignoreSpaceCheck);
+                };
 
                 // Show terminate for running jobs
                 const runningStatuses = ['pending', 'initializing', 'downloading', 'converting', 'quantizing', 'uploading'];
@@ -1741,19 +1749,23 @@ async function requestModel() {
                     terminateBtn.style.display = 'inline-block';
                     deleteBtn.style.display = 'none';
                     continueBtn.style.display = 'none';
+                    continueIgnoreSpace.style.display = 'none';
                 } else if (model.status === 'interrupted') {
                     // Show Continue button for interrupted jobs
                     terminateBtn.style.display = 'none';
                     deleteBtn.style.display = 'inline-block';
                     continueBtn.style.display = 'inline-block';
+                    continueIgnoreSpace.style.display = 'flex';
                 } else if (model.status === 'error' || model.status === 'complete' || model.status === 'terminated') {
                     terminateBtn.style.display = 'none';
                     deleteBtn.style.display = 'inline-block';
                     continueBtn.style.display = 'none';
+                    continueIgnoreSpace.style.display = 'none';
                 } else {
                     terminateBtn.style.display = 'none';
                     deleteBtn.style.display = 'none';
                     continueBtn.style.display = 'none';
+                    continueIgnoreSpace.style.display = 'none';
                 }
             }
         });
@@ -1795,11 +1807,15 @@ async function requestModel() {
         }
     }
 
-    async function continueModel(modelId, modelName) {
+    async function continueModel(modelId, modelName, ignoreSpaceCheck = false) {
         if (!confirm(`Continue interrupted job for "${modelName}"?\n\nThis will resume quantization from where it left off.`)) return;
 
         try {
-            const res = await fetch(`/api/models/${modelId}/continue`, { method: 'POST' });
+            const res = await fetch(`/api/models/${modelId}/continue`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ignore_space_check: ignoreSpaceCheck })
+            });
             const data = await res.json();
             if (res.ok) {
                 showToast('success', data.message || 'Job resumed.');
@@ -2607,28 +2623,36 @@ async function requestModel() {
                 const deleteBtn = existingCard.querySelector('.delete-btn');
                 const terminateBtn = existingCard.querySelector('.terminate-btn');
                 const continueBtn = existingCard.querySelector('.continue-btn');
+                const continueIgnoreSpace = existingCard.querySelector('.continue-ignore-space');
 
                 deleteBtn.onclick = () => deleteModel(model.id, model.hf_repo_id);
                 terminateBtn.onclick = () => terminateModel(model.id, model.hf_repo_id);
-                continueBtn.onclick = () => continueModel(model.id, model.hf_repo_id);
+                continueBtn.onclick = () => {
+                    const ignoreSpaceCheck = continueIgnoreSpace.querySelector('.ignore-space-checkbox').checked;
+                    continueModel(model.id, model.hf_repo_id, ignoreSpaceCheck);
+                };
 
                 const runningStatuses = ['pending', 'initializing', 'downloading', 'converting', 'quantizing', 'uploading'];
                 if (runningStatuses.includes(model.status)) {
                     terminateBtn.style.display = 'inline-block';
                     deleteBtn.style.display = 'none';
                     continueBtn.style.display = 'none';
+                    continueIgnoreSpace.style.display = 'none';
                 } else if (model.status === 'interrupted') {
                     terminateBtn.style.display = 'none';
                     deleteBtn.style.display = 'inline-block';
                     continueBtn.style.display = 'inline-block';
+                    continueIgnoreSpace.style.display = 'flex';
                 } else if (['error', 'complete', 'terminated'].includes(model.status)) {
                     terminateBtn.style.display = 'none';
                     deleteBtn.style.display = 'inline-block';
                     continueBtn.style.display = 'none';
+                    continueIgnoreSpace.style.display = 'none';
                 } else {
                     terminateBtn.style.display = 'none';
                     deleteBtn.style.display = 'none';
                     continueBtn.style.display = 'none';
+                    continueIgnoreSpace.style.display = 'none';
                 }
             }
         } else {
