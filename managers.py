@@ -235,6 +235,7 @@ class LlamaCppManager:
                 "-DGGML_CUDA=OFF" if not has_cuda else "-DGGML_CUDA=ON",
                 "-DCMAKE_BUILD_TYPE=Release",
                 "-DGGML_NATIVE=OFF",
+                "-Wno-dev",  # Suppress developer warnings
             ]
 
             # Platform-specific CMake generator and settings
@@ -280,7 +281,7 @@ class LlamaCppManager:
                         build_dir.mkdir(exist_ok=True)
 
                 if not cmake_success:
-                    raise Exception(f"CMake configure failed with all generators. Last error:\n{last_error[:2000]}")
+                    raise Exception(f"CMake configure failed with all generators. Last error:\n{last_error[:4000]}")
             else:
                 # Linux/macOS - simpler approach
                 build_env = os.environ.copy()
