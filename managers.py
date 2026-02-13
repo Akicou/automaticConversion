@@ -144,6 +144,19 @@ class LlamaCppManager:
                 raise Exception("Failed to clone llama.cpp")
 
     @staticmethod
+    def _decode_output(data: bytes) -> str:
+        """Safely decode subprocess output, handling encoding issues."""
+        if not data:
+            return "No output"
+        try:
+            return data.decode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                return data.decode('cp1252')  # Windows default
+            except UnicodeDecodeError:
+                return data.decode('utf-8', errors='replace')
+
+    @staticmethod
     async def build():
         """Build llama.cpp using CMake with optional CUDA support."""
         logger.info("Building llama.cpp...")
@@ -223,7 +236,7 @@ class LlamaCppManager:
                         logger.info(f"CMake configure successful with {generator}")
                         break
                     else:
-                        last_error = stdout.decode() if stdout else "No output"
+                        last_error = LlamaCppManager._decode_output(stdout)
                         logger.warning(f"CMake failed with {generator}: {last_error[:500]}")
                         # Clean build dir for next attempt
                         if build_dir.exists():
@@ -247,7 +260,7 @@ class LlamaCppManager:
                 stdout, _ = await proc.communicate()
 
                 if proc.returncode != 0:
-                    error_output = stdout.decode() if stdout else "No output"
+                    error_output = LlamaCppManager._decode_output(stdout)
                     logger.error(f"CMake configure failed:\n{error_output}")
                     raise Exception(f"CMake configure failed. Output:\n{error_output[:2000]}")
 
@@ -276,7 +289,7 @@ class LlamaCppManager:
             stdout, _ = await proc.communicate()
 
             if proc.returncode != 0:
-                error_output = stdout.decode() if stdout else "No output"
+                error_output = LlamaCppManager._decode_output(stdout)
                 logger.error(f"CMake build failed:\n{error_output}")
                 raise Exception(f"CMake build failed. Output:\n{error_output[:2000]}")
 
