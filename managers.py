@@ -148,7 +148,7 @@ class LlamaCppManager:
         """Build llama.cpp using CMake with optional CUDA support."""
         logger.info("Building llama.cpp...")
         system = platform.system()
-        
+
         # Check if already built - skip if llama-quantize exists
         try:
             existing = LlamaCppManager.get_quantize_path()
@@ -157,67 +157,116 @@ class LlamaCppManager:
                 return
         except FileNotFoundError:
             pass  # Not built yet, continue with build
-        
+
         # Check if cmake is available
         if not LlamaCppManager.check_tool("cmake"):
             raise Exception("CMake is not installed or not in PATH. Please install CMake.")
-        
+
         # Check for CUDA support
         has_cuda = await LlamaCppManager.has_nvidia_gpu()
         if has_cuda:
             logger.info("NVIDIA GPU detected, building with CUDA support...")
         else:
             logger.info("No NVIDIA GPU detected, building CPU-only version...")
-        
+
         build_dir = LLAMA_CPP_DIR / "build"
+
+        # Clean build directory if it exists but might be corrupted
+        if build_dir.exists():
+            cmake_cache = build_dir / "CMakeCache.txt"
+            if cmake_cache.exists():
+                logger.info("Existing build directory found, cleaning...")
+                shutil.rmtree(build_dir, ignore_errors=True)
+
         build_dir.mkdir(exist_ok=True)
-        
+
         try:
             # Step 1: CMake Configure
             cmake_args = [
                 "cmake", "..",
-                "-DLLAMA_CURL=OFF",
-                "-DCMAKE_BUILD_TYPE=Release"
+                "-DGGML_CUDA=OFF" if not has_cuda else "-DGGML_CUDA=ON",
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DGGML_NATIVE=OFF",  # Disable native optimizations for broader compatibility
             ]
-            
-            # Add CUDA flag if available
-            if has_cuda:
-                cmake_args.append("-DGGML_CUDA=ON")
-            
-            # Windows-specific: use Release config
+
+            # Platform-specific CMake generator and settings
             if system == "Windows":
-                cmake_args.extend(["-A", "x64"])
-            
-            logger.info(f"Running CMake configure: {' '.join(cmake_args)}")
-            
-            proc = await asyncio.create_subprocess_exec(
-                *cmake_args,
-                cwd=build_dir,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT
-            )
-            stdout, _ = await proc.communicate()
-            
-            if proc.returncode != 0:
-                error_output = stdout.decode() if stdout else "No output"
-                logger.error(f"CMake configure failed:\n{error_output}")
-                raise Exception(f"CMake configure failed. Output:\n{error_output[:2000]}")
-            
-            logger.info("CMake configure successful")
-            
+                # Try different generators in order of preference
+                generators = [
+                    ("Visual Studio 17 2022", "x64"),
+                    ("Visual Studio 16 2019", "x64"),
+                    ("MinGW Makefiles", None),
+                    ("NMake Makefiles", None),
+                ]
+
+                cmake_success = False
+                last_error = ""
+
+                for generator, arch in generators:
+                    logger.info(f"Trying CMake generator: {generator}")
+                    test_args = cmake_args.copy()
+                    test_args.extend(["-G", generator])
+                    if arch:
+                        test_args.extend(["-A", arch])
+
+                    proc = await asyncio.create_subprocess_exec(
+                        *test_args,
+                        cwd=build_dir,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT,
+                        env={**os.environ, "CMAKE_GENERATOR": generator}
+                    )
+                    stdout, _ = await proc.communicate()
+
+                    if proc.returncode == 0:
+                        cmake_success = True
+                        logger.info(f"CMake configure successful with {generator}")
+                        break
+                    else:
+                        last_error = stdout.decode() if stdout else "No output"
+                        logger.warning(f"CMake failed with {generator}: {last_error[:500]}")
+                        # Clean build dir for next attempt
+                        if build_dir.exists():
+                            shutil.rmtree(build_dir, ignore_errors=True)
+                        build_dir.mkdir(exist_ok=True)
+
+                if not cmake_success:
+                    raise Exception(f"CMake configure failed with all generators. Last error:\n{last_error[:2000]}")
+            else:
+                # Linux/macOS - simpler approach
+                cmake_args.extend(["-DGGML_BLAS=OFF"])  # Disable BLAS for simpler builds
+
+                logger.info(f"Running CMake configure: {' '.join(cmake_args)}")
+
+                proc = await asyncio.create_subprocess_exec(
+                    *cmake_args,
+                    cwd=build_dir,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT
+                )
+                stdout, _ = await proc.communicate()
+
+                if proc.returncode != 0:
+                    error_output = stdout.decode() if stdout else "No output"
+                    logger.error(f"CMake configure failed:\n{error_output}")
+                    raise Exception(f"CMake configure failed. Output:\n{error_output[:2000]}")
+
+                logger.info("CMake configure successful")
+
             # Step 2: CMake Build
             build_args = ["cmake", "--build", ".", "--config", "Release"]
-            
+
             # Use multiple cores for faster builds
-            if system != "Windows":
-                import multiprocessing
-                cores = multiprocessing.cpu_count()
-                build_args.extend(["-j", str(cores)])
-            else:
+            import multiprocessing
+            cores = multiprocessing.cpu_count()
+
+            if system == "Windows":
                 build_args.extend(["--", "/m"])  # Parallel build for MSBuild
-            
+            else:
+                build_args.extend(["-j", str(cores)])
+
             logger.info(f"Running CMake build: {' '.join(build_args)}")
-            
+
             proc = await asyncio.create_subprocess_exec(
                 *build_args,
                 cwd=build_dir,
@@ -225,22 +274,31 @@ class LlamaCppManager:
                 stderr=asyncio.subprocess.STDOUT
             )
             stdout, _ = await proc.communicate()
-            
+
             if proc.returncode != 0:
                 error_output = stdout.decode() if stdout else "No output"
                 logger.error(f"CMake build failed:\n{error_output}")
                 raise Exception(f"CMake build failed. Output:\n{error_output[:2000]}")
-            
+
             cuda_status = "with CUDA" if has_cuda else "CPU-only"
             logger.info(f"Build successful ({cuda_status}) on {system}")
-            
+
         except Exception as e:
             logger.error(f"Build failed: {e}")
             raise Exception(
-                f"Failed to build llama.cpp: {str(e)}\n"
+                f"Failed to build llama.cpp: {str(e)}\n\n"
                 "Ensure build tools are installed:\n"
-                "  - Windows: Visual Studio Build Tools + CMake\n"
-                "  - Linux: build-essential, cmake, (nvidia-cuda-toolkit for GPU)"
+                "  Windows:\n"
+                "    - Visual Studio Build Tools 2019 or 2022\n"
+                "    - CMake (https://cmake.org/download/)\n"
+                "    - Or use: winget install Microsoft.VisualStudio.2022.BuildTools\n"
+                "    - Or use: winget install Kitware.CMake\n\n"
+                "  Linux (Ubuntu/Debian):\n"
+                "    - sudo apt install build-essential cmake\n"
+                "    - For CUDA: sudo apt install nvidia-cuda-toolkit\n\n"
+                "  macOS:\n"
+                "    - xcode-select --install\n"
+                "    - brew install cmake"
             )
 
     @staticmethod
