@@ -28,6 +28,12 @@
                     <span class="logo-text">GGUF Forge</span>
                 </a>
 
+                <button class="hamburger-btn" aria-label="Toggle navigation" aria-expanded="false">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+
                 <div class="nav-links">
                     <a href="/" class="nav-item {{ 'active' if request.url.path == '/' else '' }}">Dashboard</a>
                     {% if user %}

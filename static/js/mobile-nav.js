@@ -11,32 +11,15 @@ class MobileNavManager {
     }
 
     init() {
-        this.createHamburgerButton();
+        this.setupHamburgerButton();
         this.setupEventListeners();
         this.handleResize();
     }
 
-    createHamburgerButton() {
-        const navContent = document.querySelector('.nav-content');
-        const navLinks = document.querySelector('.nav-links');
-        if (!navContent || !navLinks) return;
-
-        // Check if hamburger already exists
-        if (document.querySelector('.hamburger-btn')) return;
-
-        const hamburger = document.createElement('button');
-        hamburger.className = 'hamburger-btn';
-        hamburger.setAttribute('aria-label', 'Toggle navigation');
-        hamburger.setAttribute('aria-expanded', 'false');
-        hamburger.innerHTML = `
-            <span></span>
-            <span></span>
-            <span></span>
-        `;
-
+    setupHamburgerButton() {
+        const hamburger = document.querySelector('.hamburger-btn');
+        if (!hamburger) return;
         hamburger.addEventListener('click', () => this.toggleNav());
-        // Insert before nav-links so it appears on the right side before the drawer
-        navContent.insertBefore(hamburger, navLinks);
     }
 
     setupEventListeners() {
@@ -82,7 +65,7 @@ class MobileNavManager {
         }
 
         this.navOpen = true;
-        document.body.style.overflow = 'hidden'; // Prevent scrolling
+        document.body.style.overflow = 'hidden';
     }
 
     closeNav() {
@@ -102,7 +85,6 @@ class MobileNavManager {
     }
 
     handleResize() {
-        // Close mobile nav on resize to desktop
         if (window.innerWidth >= this.mobileBreakpoint && this.navOpen) {
             this.closeNav();
         }
