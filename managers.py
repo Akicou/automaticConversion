@@ -244,6 +244,7 @@ class LlamaCppManager:
                 build_env = LlamaCppManager._get_vs_env()
 
                 # Try Visual Studio generators first (they work best with proper env)
+                # If CUDA fails, fall back to CPU-only
                 generators = [
                     ("Visual Studio 17 2022", "x64"),
                     ("Visual Studio 16 2019", "x64"),
@@ -252,6 +253,7 @@ class LlamaCppManager:
                 cmake_success = False
                 last_error = ""
 
+                # First try with CUDA if detected
                 for generator, arch in generators:
                     logger.info(f"Trying CMake generator: {generator}")
                     test_args = cmake_args.copy()
@@ -279,6 +281,45 @@ class LlamaCppManager:
                         if build_dir.exists():
                             shutil.rmtree(build_dir, ignore_errors=True)
                         build_dir.mkdir(exist_ok=True)
+
+                # If CUDA build failed and we have CUDA, try CPU-only as fallback
+                if not cmake_success and has_cuda:
+                    logger.warning("CUDA build failed, falling back to CPU-only build...")
+                    cmake_args_cpu = [
+                        "cmake", "..",
+                        "-DGGML_CUDA=OFF",
+                        "-DCMAKE_BUILD_TYPE=Release",
+                        "-DGGML_NATIVE=OFF",
+                        "-Wno-dev",
+                    ]
+
+                    for generator, arch in generators:
+                        logger.info(f"Retrying with CPU-only: {generator}")
+                        test_args = cmake_args_cpu.copy()
+                        test_args.extend(["-G", generator])
+                        if arch:
+                            test_args.extend(["-A", arch])
+
+                        proc = await asyncio.create_subprocess_exec(
+                            *test_args,
+                            cwd=build_dir,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.STDOUT,
+                            env=build_env
+                        )
+                        stdout, _ = await proc.communicate()
+
+                        if proc.returncode == 0:
+                            cmake_success = True
+                            has_cuda = False  # Update flag since we're building CPU-only
+                            logger.info(f"CMake configure successful with {generator} (CPU-only)")
+                            break
+                        else:
+                            last_error = LlamaCppManager._decode_output(stdout)
+                            logger.warning(f"CMake failed with {generator}: {last_error[:500]}")
+                            if build_dir.exists():
+                                shutil.rmtree(build_dir, ignore_errors=True)
+                            build_dir.mkdir(exist_ok=True)
 
                 if not cmake_success:
                     raise Exception(f"CMake configure failed with all generators. Last error:\n{last_error[:4000]}")

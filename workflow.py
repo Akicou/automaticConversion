@@ -123,7 +123,7 @@ class ModelQueue:
         
         # Broadcast queue update via WebSocket
         from websocket_manager import manager as ws_manager
-        await ws_manager.broadcast({
+        await ws_manager.broadcast("models", {
             "type": "queue_update",
             "queue_size": self.queue.qsize(),
             "current_model": self.current_workflow.model_id if self.current_workflow else None
@@ -168,7 +168,7 @@ class ModelQueue:
                     
                     # Broadcast queue update
                     from websocket_manager import manager as ws_manager
-                    await ws_manager.broadcast({
+                    await ws_manager.broadcast("models", {
                         "type": "queue_update",
                         "queue_size": self.queue.qsize(),
                         "current_model": None
