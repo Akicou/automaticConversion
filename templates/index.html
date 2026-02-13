@@ -631,6 +631,7 @@
                 <h3 class="model-name" style="margin: 0 0 0.5rem 0; font-size: 1.05rem; font-weight: 500; word-break: break-word;">Model Name</h3>
                 <div class="model-meta" style="display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.75rem; color: var(--text-secondary);">
                     <span class="model-id-badge" style="font-family: 'JetBrains Mono', monospace; opacity: 0.6;">ID: <span class="model-id-val"></span></span>
+                    <span class="model-requester" style="display: none;"><span style="opacity: 0.6;">Requested by:</span> <a class="requester-link" href="#" target="_blank" style="color: #60a5fa; text-decoration: none;"></a></span>
                     <button class="view-quants-btn" onclick="toggleQuants(event)" style="background: none; border: 1px solid rgba(255,255,255,0.15); color: var(--text-secondary); padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem; transition: all 0.2s;">
                         View Quants
                     </button>
@@ -1869,7 +1870,20 @@ async function requestModel() {
                 modelIdVal.textContent = model.id.substring(0, 8);
                 modelIdVal.title = model.id; // Full ID on hover
             }
-            
+
+            // Show requester if available
+            const requesterEl = card.querySelector('.model-requester');
+            if (requesterEl && model.requested_by) {
+                requesterEl.style.display = 'inline';
+                const requesterLink = requesterEl.querySelector('.requester-link');
+                if (requesterLink) {
+                    requesterLink.textContent = '@' + model.requested_by;
+                    requesterLink.href = 'https://huggingface.co/' + model.requested_by;
+                }
+            } else if (requesterEl) {
+                requesterEl.style.display = 'none';
+            }
+
             // Add status class to card for styling
             card.className = `model-card glass-panel status-${model.status.toLowerCase()}`;
             card.dataset.modelId = model.id;
@@ -2769,6 +2783,21 @@ async function requestModel() {
         if (existingCard) {
             // Update existing card
             existingCard.querySelector('.model-name').textContent = model.hf_repo_id;
+
+            // Update requester if available
+            const requesterEl = existingCard.querySelector('.model-requester');
+            if (requesterEl) {
+                if (model.requested_by) {
+                    requesterEl.style.display = 'inline';
+                    const requesterLink = requesterEl.querySelector('.requester-link');
+                    if (requesterLink) {
+                        requesterLink.textContent = '@' + model.requested_by;
+                        requesterLink.href = 'https://huggingface.co/' + model.requested_by;
+                    }
+                } else {
+                    requesterEl.style.display = 'none';
+                }
+            }
 
             const badge = existingCard.querySelector('.status-badge');
             badge.textContent = model.status.toUpperCase();

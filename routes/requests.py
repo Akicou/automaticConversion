@@ -185,32 +185,36 @@ async def approve_request(
     
     # Update request status and approved quants
     await conn.execute(
-        "UPDATE requests SET status = 'approved', approved_quants = ? WHERE id = ?", 
+        "UPDATE requests SET status = 'approved', approved_quants = ? WHERE id = ?",
         (approved_quants_json, request_id)
     )
     await conn.commit()
-    
+
     # Start the conversion
     hf_repo_id = req['hf_repo_id']
+    requested_by = req.get('requested_by')  # Who requested this model
     new_id = str(uuid.uuid4())
-    
+
     # Build initial log message
     log_msg = f"Queued from approved request... Quants: {', '.join(approved_quants)}"
+    if requested_by:
+        log_msg += f"\n📋 Requested by: @{requested_by}"
     if ignore_space_check:
         log_msg += "\n⚠ Admin override: Space check disabled"
     if not enable_shard_merging:
         log_msg += "\n⚠ Admin override: Shard merging disabled"
 
     await conn.execute(
-        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, ignore_space_check, quants_to_run, enable_shard_merging) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (new_id, hf_repo_id, "pending", 0, log_msg, "", 1 if ignore_space_check else 0, json.dumps(approved_quants), 1 if enable_shard_merging else 0)
+        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, ignore_space_check, quants_to_run, enable_shard_merging, requested_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (new_id, hf_repo_id, "pending", 0, log_msg, "", 1 if ignore_space_check else 0, json.dumps(approved_quants), 1 if enable_shard_merging else 0, requested_by)
     )
     await conn.commit()
     await conn.close()
-    
-    # Pass approved quants and admin flags to workflow
+
+    # Pass approved quants, admin flags, and requester to workflow
     workflow = ModelWorkflow(new_id, hf_repo_id, quants_to_run=approved_quants,
-                             ignore_space_check=ignore_space_check, enable_shard_merging=enable_shard_merging)
+                             ignore_space_check=ignore_space_check, enable_shard_merging=enable_shard_merging,
+                             requested_by=requested_by)
     
     # Add to queue instead of running directly
     queue = get_model_queue()
