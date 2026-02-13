@@ -896,24 +896,31 @@
 
         container.innerHTML = '';
         availableQuants.forEach(quant => {
-            const label = document.createElement('label');
-            label.style.cssText = 'display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.5rem 0.6rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid transparent; transition: all 0.15s; -webkit-tap-highlight-color: transparent;';
-            label.title = quantDescriptions[quant] || quant;
-            label.innerHTML = `
-                <input type="checkbox" class="quant-checkbox" value="${quant}" onchange="updateQuantCount()" style="accent-color: var(--success); cursor: pointer; width: 16px; height: 16px; flex-shrink: 0;">
-                <span style="font-size: 0.8rem; font-family: monospace; color: var(--text-primary); word-break: break-word;">${quant}</span>
-            `;
-            label.onmouseover = () => label.style.borderColor = 'var(--glass-border)';
-            label.onmouseout = () => label.style.borderColor = 'transparent';
-            label.onmousedown = (e) => {
-                e.preventDefault(); // Prevent double-tap zoom
-                setTimeout(() => {
-                    const checkbox = label.querySelector('.quant-checkbox');
-                    checkbox.checked = !checkbox.checked;
-                    updateQuantCount();
-                }, 50);
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'display: flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.6rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid transparent; transition: all 0.15s;';
+            wrapper.title = quantDescriptions[quant] || quant;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'quant-checkbox';
+            checkbox.value = quant;
+            checkbox.style.cssText = 'accent-color: var(--success); cursor: pointer; width: 16px; height: 16px; flex-shrink: 0;';
+            checkbox.addEventListener('change', updateQuantCount);
+
+            const span = document.createElement('span');
+            span.style.cssText = 'font-size: 0.8rem; font-family: monospace; color: var(--text-primary); word-break: break-word; cursor: pointer; user-select: none;';
+            span.textContent = quant;
+            span.onclick = () => {
+                checkbox.checked = !checkbox.checked;
+                updateQuantCount();
             };
-            container.appendChild(label);
+
+            wrapper.onmouseover = () => wrapper.style.borderColor = 'var(--glass-border)';
+            wrapper.onmouseout = () => wrapper.style.borderColor = 'transparent';
+
+            wrapper.appendChild(checkbox);
+            wrapper.appendChild(span);
+            container.appendChild(wrapper);
         });
         updateQuantCount();
     }
