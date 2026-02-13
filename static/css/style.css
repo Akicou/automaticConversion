@@ -69,150 +69,11 @@ body {
     align-items: center;
 }
 
-@media (max-width: 768px) {
-    .nav-content {
-        padding: 0 0.75rem;
-    }
-
-    /* Hamburger button */
-    .hamburger-btn {
-        display: flex !important;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        gap: 5px;
-        width: 44px;
-        height: 44px;
-        background: transparent;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        padding: 10px;
-        z-index: 100;
-        -webkit-tap-highlight-color: transparent;
-        flex-shrink: 0;
-        margin-left: auto;
-    }
-
-    .hamburger-btn span {
-        display: block;
-        width: 22px;
-        height: 2px;
-        background: var(--text-primary);
-        border-radius: 2px;
-        transition: all 0.3s ease;
-    }
-
-    .hamburger-btn:active {
-        background: var(--bg-tertiary);
-    }
-
-    .hamburger-btn.hamburger-open span:nth-child(1) {
-        transform: translateY(7px) rotate(45deg);
-    }
-
-    .hamburger-btn.hamburger-open span:nth-child(2) {
-        opacity: 0;
-    }
-
-    .hamburger-btn.hamburger-open span:nth-child(3) {
-        transform: translateY(-7px) rotate(-45deg);
-    }
-
-    /* Mobile drawer */
-    .nav-links {
-        position: fixed;
-        top: 0;
-        right: -100%;
-        width: 280px;
-        height: 100vh;
-        background: var(--bg-primary);
-        border-left: 1px solid var(--border-color);
-        display: flex !important;
-        flex-direction: column !important;
-        padding: 0;
-        gap: 0 !important;
-        transition: right 0.3s ease;
-        z-index: 99;
-        overflow-y: auto;
-    }
-
-    .nav-links.nav-links-open {
-        right: 0;
-    }
-
-    /* Nav items in drawer */
-    .nav-links .nav-item,
-    .nav-links .nav-btn {
-        display: flex !important;
-        align-items: center;
-        width: 100%;
-        min-height: 48px;
-        padding: 0 1.25rem;
-        border-bottom: 1px solid var(--border-color);
-        border-radius: 0;
-    }
-
-    .nav-links .nav-item:hover,
-    .nav-links .nav-btn:hover {
-        background: var(--bg-tertiary);
-    }
-
-    .nav-links .nav-item.active {
-        background: var(--bg-tertiary);
-    }
-
-    /* User menu in drawer */
-    .nav-links .user-menu {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 0 !important;
-        padding: 0;
-        margin-top: auto;
-        border-top: 1px solid var(--border-color);
-    }
-
-    .nav-links .user-menu > * {
-        display: flex !important;
-        align-items: center;
-        width: 100%;
-        min-height: 48px;
-        padding: 0 1.25rem;
-        border-bottom: 1px solid var(--border-color);
-    }
-}
-
-/* Backdrop for mobile drawer - separate element */
-.nav-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 98;
-    display: none;
-}
-
-.nav-backdrop.active {
-    display: block;
-}
-
-@media (max-width: 480px) {
-    .nav-content {
-        padding: 0 0.5rem;
-    }
-
-    .logo-text {
-        font-size: 0.95rem;
-    }
-}
-}
-
 .logo-icon {
     font-size: 1.25rem;
 }
 
+/* Desktop nav links */
 .nav-links {
     display: flex;
     align-items: center;
@@ -245,6 +106,131 @@ body {
 .user-name {
     color: var(--text-secondary);
     font-size: 0.9rem;
+}
+
+/* Hamburger button - hidden on desktop */
+.hamburger-btn {
+    display: none;
+}
+
+/* Mobile backdrop */
+.nav-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.nav-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+    .nav-content {
+        padding: 0 0.75rem;
+    }
+
+    /* Show hamburger */
+    .hamburger-btn {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        width: 44px;
+        height: 44px;
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        padding: 10px;
+        z-index: 100;
+        -webkit-tap-highlight-color: transparent;
+        margin-left: auto;
+    }
+
+    .hamburger-btn span {
+        display: block;
+        width: 22px;
+        height: 2px;
+        background: var(--text-primary);
+        border-radius: 2px;
+        transition: all 0.3s ease;
+    }
+
+    .hamburger-btn:active {
+        background: var(--bg-tertiary);
+    }
+
+    .hamburger-btn.hamburger-open span:nth-child(1) {
+        transform: translateY(7px) rotate(45deg);
+    }
+
+    .hamburger-btn.hamburger-open span:nth-child(2) {
+        opacity: 0;
+    }
+
+    .hamburger-btn.hamburger-open span:nth-child(3) {
+        transform: translateY(-7px) rotate(-45deg);
+    }
+
+    /* Mobile drawer */
+    .nav-links {
+        position: fixed;
+        top: 0;
+        right: -280px;
+        width: 280px;
+        height: 100vh;
+        background: var(--bg-primary);
+        border-left: 1px solid var(--border-color);
+        flex-direction: column;
+        align-items: stretch;
+        padding: 1rem 0;
+        gap: 0;
+        transition: right 0.3s ease;
+        z-index: 50;
+        overflow-y: auto;
+    }
+
+    .nav-links.nav-links-open {
+        right: 0;
+    }
+
+    .nav-links .nav-item,
+    .nav-links .nav-btn {
+        padding: 1rem 1.25rem;
+        border-radius: 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .nav-links .user-menu {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0;
+        margin-top: auto;
+        border-left: none;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .nav-links .user-menu > * {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+}
+
+@media (max-width: 480px) {
+    .nav-content {
+        padding: 0 0.5rem;
+    }
+
+    .logo-text {
+        font-size: 0.95rem;
+    }
 }
 
 .nav-btn {
