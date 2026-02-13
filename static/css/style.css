@@ -73,6 +73,20 @@ body {
     font-size: 1.25rem;
 }
 
+.nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.nav-logo:hover {
+    opacity: 0.9;
+}
+
 /* Desktop nav links */
 .nav-links {
     display: flex;
@@ -137,7 +151,7 @@ body {
 
     /* Show hamburger */
     .hamburger-btn {
-        display: flex;
+        display: flex !important;
         flex-direction: column;
         justify-content: center;
         align-items: center;
