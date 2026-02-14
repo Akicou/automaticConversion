@@ -293,6 +293,9 @@ async def continue_model(model_id: str, background_tasks: BackgroundTasks, body:
     if model.get('enable_shard_merging') is not None:
         enable_shard_merging = bool(model['enable_shard_merging'])
 
+    # Get requester info
+    requested_by = model.get('requested_by')
+
     # Build log message
     log_msg = model['log'] + "\n\n━━━ RESUMING JOB ━━━\n"
     if ignore_space_check:
@@ -314,7 +317,8 @@ async def continue_model(model_id: str, background_tasks: BackgroundTasks, body:
         completed_quants=completed_quants,
         quants_to_run=quants_to_run,
         ignore_space_check=ignore_space_check,
-        enable_shard_merging=enable_shard_merging
+        enable_shard_merging=enable_shard_merging,
+        requested_by=requested_by
     )
 
     # Add to queue instead of running directly

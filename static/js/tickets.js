@@ -37,15 +37,15 @@ function showTicketModal(ticketId) {
                     <h3 id="ticket-title" style="margin: 0; font-size: 1.1rem; word-break: break-word; overflow-wrap: anywhere;">Discussion Thread</h3>
                     <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0;">
                         <button id="ticket-reopen-btn" onclick="reopenTicket()" style="display: none; background: transparent; color: #60a5fa; border: 1px solid #60a5fa; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Reopen</button>
-                        <button onclick="closeTicketModal()" style="background: transparent; color: var(--text-secondary); border: none; cursor: pointer; font-size: 1.5rem; padding: 0.25rem; line-height: 1; min-width: 40px; min-height: 40px;">&times;</button>
+                        <button onclick="closeTicketModal()" style="background: transparent; color: var(--text-secondary); border: none; cursor: pointer; font-size: 1.5rem; padding: 0.25rem; line-height: 1; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center;">&times;</button>
                     </div>
                 </div>
-                <div id="ticket-messages" style="flex: 1; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--glass-border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem; background: rgba(0,0,0,0.3); min-height: 100px;">
+                <div id="ticket-messages" style="flex: 1; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--glass-border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem; background: rgba(0,0,0,0.3); min-height: 100px; -webkit-overflow-scrolling: touch;">
                     <div style="text-align: center; color: var(--text-secondary);">Loading...</div>
                 </div>
                 <div id="ticket-reply-section" style="display: flex; gap: 0.5rem; flex-shrink: 0;">
-                    <input type="text" id="ticket-reply-input" placeholder="Type your message..." style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 0.75rem; border-radius: 6px; color: var(--text-primary); min-width: 0;">
-                    <button onclick="sendTicketReply()" class="primary" style="padding: 0.75rem 1.25rem; white-space: nowrap;">Send</button>
+                    <input type="text" id="ticket-reply-input" placeholder="Type your message..." autocomplete="off" autocorrect="off" autocapitalize="off" style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 0.875rem; border-radius: 6px; color: var(--text-primary); min-width: 0; font-size: 16px;">
+                    <button onclick="sendTicketReply()" class="primary" style="padding: 0.875rem 1.25rem; white-space: nowrap; min-height: 48px;">Send</button>
                 </div>
                 <div id="ticket-closed-notice" style="display: none; text-align: center; color: var(--text-secondary); padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 6px; font-size: 0.9rem; flex-shrink: 0;">
                     This thread is closed. <a href="#" onclick="reopenTicket(); return false;" style="color: #60a5fa;">Reopen to reply</a>
@@ -53,14 +53,24 @@ function showTicketModal(ticketId) {
             </div>
         `;
         document.body.appendChild(modal);
+
+        // Handle keyboard showing on mobile - scroll to bottom when input is focused
+        const replyInput = document.getElementById('ticket-reply-input');
+        replyInput.addEventListener('focus', () => {
+            setTimeout(() => {
+                const messagesContainer = document.getElementById('ticket-messages');
+                if (messagesContainer) {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+            }, 300);
+        });
     }
 
     modal.style.display = 'block';
 
     // Prevent body scroll when modal is open
     document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
+    document.body.classList.add('modal-open');
 
     loadTicketMessages(ticketId);
 }
@@ -74,8 +84,7 @@ function closeTicketModal() {
 
     // Restore body scroll
     document.body.style.overflow = '';
-    document.body.style.position = '';
-    document.body.style.width = '';
+    document.body.classList.remove('modal-open');
 }
 
 async function loadTicketMessages(ticketId) {

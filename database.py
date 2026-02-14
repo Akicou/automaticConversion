@@ -561,7 +561,8 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
             completed_quants TEXT DEFAULT '',
             ignore_space_check INTEGER DEFAULT 0,
             quants_to_run TEXT DEFAULT '',
-            enable_shard_merging INTEGER DEFAULT 1
+            enable_shard_merging INTEGER DEFAULT 1,
+            requested_by TEXT
         )
     ''')
     
@@ -588,7 +589,13 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
         await conn.execute("ALTER TABLE models ADD COLUMN enable_shard_merging INTEGER DEFAULT 1")
     except:
         pass  # Column already exists
-    
+
+    # Migration: Add requested_by column if it doesn't exist
+    try:
+        await conn.execute("ALTER TABLE models ADD COLUMN requested_by TEXT")
+    except:
+        pass  # Column already exists
+
     # Requests table
     await conn.execute('''
         CREATE TABLE IF NOT EXISTS requests (
@@ -721,7 +728,8 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
             completed_quants NVARCHAR(MAX) DEFAULT '',
             ignore_space_check BIT DEFAULT 0,
             quants_to_run NVARCHAR(MAX) DEFAULT '',
-            enable_shard_merging BIT DEFAULT 1
+            enable_shard_merging BIT DEFAULT 1,
+            requested_by NVARCHAR(255)
         )
     ''')
     await conn.commit()
@@ -765,7 +773,17 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
         await conn.commit()
     except:
         pass
-    
+
+    # Migration: Add requested_by column if it doesn't exist
+    try:
+        await conn.execute('''
+            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'requested_by')
+            ALTER TABLE models ADD requested_by NVARCHAR(255)
+        ''')
+        await conn.commit()
+    except:
+        pass
+
     # Requests table
     await conn.execute('''
         IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='requests' AND xtype='U')

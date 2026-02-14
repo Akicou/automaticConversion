@@ -69,148 +69,25 @@ body {
     align-items: center;
 }
 
-@media (max-width: 768px) {
-    .nav-content {
-        padding: 0 0.75rem;
-    }
-
-    /* Show hamburger button on mobile/tablet */
-    .hamburger-btn {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-around;
-        width: 32px;
-        height: 24px;
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        padding: 0;
-        z-index: 51;
-        transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .hamburger-btn:active {
-        transform: scale(0.95);
-    }
-
-    .hamburger-btn span {
-        width: 100%;
-        height: 2.5px;
-        background: var(--text-primary);
-        border-radius: 2px;
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
-    }
-
-    .hamburger-btn:hover span {
-        opacity: 0.8;
-    }
-
-    .hamburger-btn.hamburger-open span:nth-child(1) {
-        transform: rotate(45deg) translate(5px, 6px);
-    }
-
-    .hamburger-btn.hamburger-open span:nth-child(2) {
-        opacity: 0;
-    }
-
-    .hamburger-btn.hamburger-open span:nth-child(3) {
-        transform: rotate(-45deg) translate(5px, -6px);
-    }
-
-    /* Mobile Navigation Drawer */
-    .nav-links {
-        position: fixed;
-        top: 60px;
-        right: -100%;
-        width: 280px;
-        height: calc(100vh - 60px);
-        background: var(--bg-glass-solid);
-        backdrop-filter: var(--nav-glass-blur);
-        -webkit-backdrop-filter: var(--nav-glass-blur);
-        border-left: 1px solid var(--border-color);
-        flex-direction: column;
-        padding: 2rem 1.5rem;
-        gap: 1rem;
-        transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 49;
-        overflow-y: auto;
-    }
-
-    .nav-links.nav-links-open {
-        right: 0;
-    }
-
-    /* Backdrop overlay for mobile drawer */
-    .nav-links.nav-links-open::before {
-        content: '';
-        position: fixed;
-        top: 60px;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: -1;
-    }
-
-    [data-theme="light"] .nav-links.nav-links-open::before {
-        background: rgba(0, 0, 0, 0.3);
-    }
-
-    /* Touch-friendly targets */
-    .nav-item,
-    .nav-btn {
-        min-height: 44px;
-        display: flex;
-        align-items: center;
-        padding: 0.75rem 1rem;
-    }
-
-    .user-menu {
-        flex-direction: column;
-        gap: 1rem;
-        padding: 1rem 0;
-        border-top: 1px solid var(--border-color);
-        margin-top: auto;
-    }
-}
-
-@media (max-width: 480px) {
-    .nav-content {
-        padding: 0 0.5rem;
-    }
-
-    .logo-text {
-        font-size: 0.95rem;
-    }
-
-    .user-name {
-        font-size: 0.8rem;
-        max-width: 80px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
+.logo-icon {
+    font-size: 1.25rem;
 }
 
 .nav-logo {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
     text-decoration: none;
     color: var(--text-primary);
     font-weight: 600;
-    font-size: 1.1rem;
-    transition: opacity 0.2s;
+    font-size: 1rem;
 }
 
 .nav-logo:hover {
     opacity: 0.9;
 }
 
-.logo-icon {
-    font-size: 1.25rem;
-}
-
+/* Desktop nav links */
 .nav-links {
     display: flex;
     align-items: center;
@@ -243,6 +120,186 @@ body {
 .user-name {
     color: var(--text-secondary);
     font-size: 0.9rem;
+}
+
+/* Hamburger button - hidden on desktop */
+.hamburger-btn {
+    display: none;
+}
+
+/* Mobile backdrop */
+.nav-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.nav-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+    .nav-content {
+        padding: 0 0.75rem;
+    }
+
+    /* Show hamburger */
+    .hamburger-btn {
+        display: flex !important;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        width: 44px;
+        height: 44px;
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        padding: 10px;
+        z-index: 100;
+        -webkit-tap-highlight-color: transparent;
+        margin-left: auto;
+    }
+
+    .hamburger-btn span {
+        display: block;
+        width: 22px;
+        height: 2px;
+        background: var(--text-primary);
+        border-radius: 2px;
+        transition: all 0.3s ease;
+    }
+
+    .hamburger-btn:active {
+        background: var(--bg-tertiary);
+    }
+
+    .hamburger-btn.hamburger-open span:nth-child(1) {
+        transform: translateY(7px) rotate(45deg);
+    }
+
+    .hamburger-btn.hamburger-open span:nth-child(2) {
+        opacity: 0;
+    }
+
+    .hamburger-btn.hamburger-open span:nth-child(3) {
+        transform: translateY(-7px) rotate(-45deg);
+    }
+
+    /* Mobile drawer */
+    .nav-links {
+        position: fixed;
+        top: 0;
+        right: -300px;
+        width: 280px;
+        height: 100vh;
+        background: var(--bg-secondary);
+        border-left: 1px solid var(--border-color);
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0;
+        gap: 0;
+        transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 50;
+        overflow-y: auto;
+        box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    }
+
+    .nav-links.nav-links-open {
+        right: 0;
+    }
+
+    /* Drawer header */
+    .nav-links::before {
+        content: 'Menu';
+        display: block;
+        padding: 1.5rem 1.25rem 1rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-secondary);
+        opacity: 0.7;
+    }
+
+    .nav-links .nav-item,
+    .nav-links .nav-btn {
+        padding: 0.875rem 1.25rem;
+        border-radius: 0;
+        font-size: 0.95rem;
+        border: none;
+        position: relative;
+    }
+
+    .nav-links .nav-item:hover,
+    .nav-links .nav-btn:hover {
+        background: var(--bg-tertiary);
+    }
+
+    .nav-links .nav-item.active {
+        background: var(--bg-tertiary);
+        font-weight: 500;
+    }
+
+    .nav-links .nav-item.active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: var(--accent, #60a5fa);
+    }
+
+    /* User section at bottom */
+    .nav-links .user-menu {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0;
+        margin-top: auto;
+        border-left: none;
+        border-top: 1px solid var(--border-color);
+        background: var(--bg-tertiary);
+    }
+
+    .nav-links .user-menu::before {
+        content: 'Account';
+        display: block;
+        padding: 1rem 1.25rem 0.5rem;
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-secondary);
+        opacity: 0.6;
+    }
+
+    .nav-links .user-menu > * {
+        padding: 0.75rem 1.25rem;
+        border: none;
+    }
+
+    .nav-links .user-menu .user-name {
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+}
+
+@media (max-width: 480px) {
+    .nav-content {
+        padding: 0 0.5rem;
+    }
+
+    .logo-text {
+        font-size: 0.95rem;
+    }
 }
 
 .nav-btn {
@@ -906,4 +963,96 @@ button.primary:hover {
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* ===== TICKET MODAL MOBILE STYLES ===== */
+@media (max-width: 640px) {
+    /* Full-screen ticket modal on mobile */
+    #ticket-modal .ticket-modal-content {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        transform: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+        padding: 1rem !important;
+    }
+
+    #ticket-modal .ticket-modal-backdrop {
+        display: none !important;
+    }
+
+    /* Better touch-friendly header */
+    #ticket-modal .ticket-modal-content > div:first-child {
+        padding: 0.5rem 0;
+        margin-bottom: 0.75rem !important;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    #ticket-modal h3 {
+        font-size: 1rem !important;
+        padding-right: 0.5rem;
+    }
+
+    #ticket-modal button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Better message input on mobile */
+    #ticket-reply-input {
+        font-size: 16px !important; /* Prevents iOS zoom on focus */
+        padding: 0.875rem !important;
+    }
+
+    /* Message container takes remaining space */
+    #ticket-messages {
+        flex: 1;
+        min-height: 0 !important;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+
+    /* Message bubbles - more compact on mobile */
+    #ticket-messages > div {
+        padding: 0.6rem !important;
+        margin-bottom: 0.5rem !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    /* Admin messages indented less on mobile */
+    #ticket-messages > div[style*="margin-left: 1rem"] {
+        margin-left: 0.5rem !important;
+    }
+
+    #ticket-messages > div[style*="margin-right: 1rem"] {
+        margin-right: 0.5rem !important;
+    }
+}
+
+/* Prevent pull-to-refresh when modal is open on mobile */
+body.modal-open {
+    overscroll-behavior: contain;
+    touch-action: none;
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+    @media (max-width: 640px) {
+        #ticket-modal .ticket-modal-content {
+            padding-bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
+            padding-left: calc(1rem + env(safe-area-inset-left)) !important;
+            padding-right: calc(1rem + env(safe-area-inset-right)) !important;
+        }
+
+        #ticket-reply-section {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    }
 }
