@@ -1,5 +1,8 @@
 # GGUF Forge
 
+ - This Project is soon deprecated and will be replaced by much better architecture and code
+
+
 A modern, glassmorphic FastAPI application to automate the conversion of HuggingFace models to GGUF format using `llama.cpp`.
 
 > 🚀 **Don't want to self-host?** Use our free hosted service at **[gguforge.com](https://gguforge.com)** — no setup required! Just login with HuggingFace and request your conversions.
