@@ -60,7 +60,7 @@ class ThemeManager {
     updateThemeButton(theme) {
         const button = document.getElementById('theme-toggle');
         if (button) {
-            button.textContent = theme === 'dark' ? '☀️' : '🌙';
+            button.textContent = theme === 'dark' ? '◑' : '◐';
             button.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`);
         }
     }

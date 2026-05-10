@@ -434,11 +434,258 @@
             font-size: 0.75rem;
         }
     }
+
+    /* ============================================
+       Dashboard polish — Vercel/Linear feel
+       ============================================ */
+    .dashboard-container {
+        padding-top: 0 !important;
+    }
+
+    .dashboard-page-header {
+        margin-bottom: 2rem;
+    }
+
+    .dashboard-page-header h1 {
+        font-size: 1.6rem;
+        font-weight: 600;
+        margin: 0 0 0.4rem;
+        letter-spacing: -0.02em;
+        color: var(--text-primary);
+    }
+
+    .dashboard-page-header p {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+
+    /* Override inline-styled section h2 */
+    .dashboard-container h2[style*="font-weight: 400"] {
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+        color: var(--text-primary) !important;
+        margin-bottom: 1rem !important;
+        letter-spacing: -0.01em;
+    }
+
+    /* Search bar — command-palette style */
+    .glass-panel.search-panel {
+        padding: 0.25rem !important;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .glass-panel.search-panel:focus-within {
+        border-color: var(--input-border-focus);
+        box-shadow: 0 0 0 4px var(--accent-bg);
+    }
+
+    .glass-panel.search-panel input {
+        padding: 0.65rem 0.85rem !important;
+        font-size: 0.9rem !important;
+    }
+
+    .glass-panel.search-panel input::placeholder {
+        color: var(--input-placeholder);
+    }
+
+    .glass-panel.search-panel button.primary {
+        margin: 4px !important;
+        padding: 0.5rem 0.95rem !important;
+        font-size: 0.825rem !important;
+    }
+
+    /* Suggestions dropdown */
+    #suggestions {
+        background: var(--bg-elevated) !important;
+        border: 1px solid var(--card-border) !important;
+        border-radius: 8px !important;
+        box-shadow: var(--shadow-md);
+        margin-top: 6px !important;
+        overflow: hidden;
+    }
+
+    /* Quant toggle / selector */
+    #quant-toggle {
+        background: var(--bg-secondary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 6px !important;
+        font-size: 0.8rem !important;
+    }
+
+    #quant-toggle:hover {
+        background: var(--bg-tertiary) !important;
+        border-color: var(--border-hover) !important;
+    }
+
+    #quant-selector {
+        background: var(--card-bg) !important;
+        border: 1px solid var(--card-border) !important;
+        border-radius: 8px !important;
+    }
+
+    /* Admin controls bar buttons */
+    #admin-controls button {
+        background: var(--bg-secondary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 6px !important;
+        font-size: 0.78rem !important;
+    }
+
+    #admin-controls button:hover:not(:disabled) {
+        background: var(--bg-tertiary) !important;
+        border-color: var(--border-hover) !important;
+        color: var(--text-primary) !important;
+    }
+
+    #admin-controls button:disabled {
+        opacity: 0.5 !important;
+    }
+
+    /* Card spacing */
+    #models-list,
+    #requests-list,
+    #tickets-list,
+    #my-requests-list,
+    #local-models-list {
+        gap: 0.6rem !important;
+    }
+
+    /* Model name */
+    .model-card .model-name {
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.01em;
+    }
+
+    /* Request / ticket model name */
+    .request-model,
+    .ticket-model {
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        letter-spacing: -0.01em;
+    }
+
+    /* View Quants button */
+    .view-quants-btn {
+        background: var(--bg-secondary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 4px !important;
+        color: var(--text-secondary) !important;
+        font-size: 0.7rem !important;
+        padding: 0.18rem 0.5rem !important;
+    }
+
+    .view-quants-btn:hover {
+        background: var(--bg-tertiary) !important;
+        border-color: var(--border-hover) !important;
+        color: var(--text-primary) !important;
+    }
+
+    /* Action buttons in card actions */
+    .approve-btn,
+    .ticket-approve-btn,
+    .continue-btn {
+        background: var(--success) !important;
+        color: #000 !important;
+        border: 1px solid var(--success) !important;
+        border-radius: 6px !important;
+        font-weight: 500 !important;
+    }
+
+    .reject-btn,
+    .terminate-btn,
+    .ticket-close-btn,
+    .delete-btn {
+        background: transparent !important;
+        border-radius: 6px !important;
+    }
+
+    .discuss-btn,
+    .ticket-view-btn {
+        background: transparent !important;
+        color: var(--accent-primary) !important;
+        border: 1px solid var(--accent-primary) !important;
+        border-radius: 6px !important;
+    }
+
+    .discuss-btn:hover,
+    .ticket-view-btn:hover {
+        background: var(--accent-bg) !important;
+    }
+
+    /* Edit quants button */
+    .edit-quants-btn {
+        background: var(--bg-secondary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 4px !important;
+        font-size: 0.7rem !important;
+    }
+
+    .edit-quants-btn:hover {
+        background: var(--bg-tertiary) !important;
+        border-color: var(--border-hover) !important;
+    }
+
+    /* Decline reason input */
+    .decline-reason-input {
+        background: var(--input-bg) !important;
+        border: 1px solid var(--input-border) !important;
+        border-radius: 6px !important;
+    }
+
+    .decline-reason-input:focus {
+        border-color: var(--input-border-focus) !important;
+        outline: none !important;
+    }
+
+    /* Quant priority panel */
+    #quant-priority-panel {
+        background: var(--card-bg) !important;
+        border: 1px solid var(--card-border) !important;
+        border-radius: 10px !important;
+    }
+
+    .quant-priority-item {
+        background: var(--bg-secondary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 6px !important;
+    }
+
+    .quant-priority-item:hover {
+        background: var(--bg-tertiary) !important;
+        border-color: var(--border-hover) !important;
+    }
+
+    /* Suggestions item */
+    .suggestions-item {
+        padding: 0.55rem 0.85rem;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: background 0.12s ease;
+    }
+
+    .suggestions-item:hover {
+        background: var(--bg-tertiary);
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container" style="max-width: 800px; margin: 0 auto; padding-top: 2rem; overflow-x: hidden;">
+<div class="dashboard-container" style="max-width: 880px; margin: 0 auto; padding-top: 0; overflow-x: hidden;">
+
+    <div class="dashboard-page-header">
+        <h1>{% if role == 'admin' %}Admin dashboard{% elif user %}Dashboard{% else %}GGUF Forge{% endif %}</h1>
+        <p>
+            {% if role == 'admin' %}Manage conversions, requests and discussions.
+            {% elif user %}Request conversions and track their progress.
+            {% else %}Convert HuggingFace models to GGUF — sign in to request conversions.
+            {% endif %}
+        </p>
+    </div>
 
     {% if role == 'admin' %}
     <!-- Admin Controls Bar -->
@@ -504,7 +751,7 @@
             {% endif %}
 
 <div id="suggestions" class="glass-panel"
-                style="position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; display: none; margin-top: 0.25rem; background: #050505; z-index: 20;">
+                style="position: absolute; top: 100%; left: 0; right: 0; max-height: 240px; overflow-y: auto; display: none; margin-top: 0.4rem; z-index: 20;">
             </div>
         </div>
         <div id="validation-message" class="validation-message"></div>
