@@ -445,8 +445,7 @@ async def websocket_endpoint(websocket: WebSocket):
 async def dashboard(request: Request):
     user = await get_current_user(request)
     # User now includes is_oauth and avatar_url fields - no need for separate query
-    return templates.TemplateResponse("index.html", {
-        "request": request, 
+    return templates.TemplateResponse(request, "index.html", {
         "user": user['username'] if user else None,
         "role": user['role'] if user else 'guest',
         "oauth_avatar": user.get('avatar_url') if user else None,
@@ -461,8 +460,7 @@ async def settings_page(request: Request):
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    return templates.TemplateResponse("settings.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "settings.html", {
         "user": user['username'] if user else None,
         "role": user['role'] if user else 'guest',
         "oauth_avatar": user.get('avatar_url') if user else None,
