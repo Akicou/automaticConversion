@@ -381,6 +381,10 @@ class ModelWorkflow:
         self.local_source_path = local_source_path
         # If True, skip HF upload and move quantized GGUFs into <local_source_path>/gguf/
         self.keep_local_only = keep_local_only
+        # Vision/multimodal support: detected during convert step, set if model has a vision tower
+        self.is_vision_model = False
+        self.mmproj_path: Optional[Path] = None
+        self.mmproj_uploaded_name: Optional[str] = None
 
     async def terminate(self):
         """Request termination of this workflow."""
@@ -449,6 +453,145 @@ class ModelWorkflow:
                 self.model_dir = None
             except Exception as e:
                 await self.log(f"  ⚠ Failed to cleanup safetensors: {e}")
+
+    async def _upload_with_retry(self, do_upload, description: str, max_attempts: int = 3) -> bool:
+        """Run a HuggingFace upload callable with retries on failure.
+
+        do_upload: zero-arg callable that performs the upload synchronously.
+        Returns True on success, False after all attempts fail.
+        """
+        loop = asyncio.get_event_loop()
+        for attempt in range(1, max_attempts + 1):
+            self.check_terminated()
+            try:
+                await loop.run_in_executor(None, do_upload)
+                if attempt > 1:
+                    await self.log(f"      ✓ {description} succeeded on attempt {attempt}")
+                return True
+            except Exception as e:
+                if attempt < max_attempts:
+                    wait_s = 2 ** attempt
+                    await self.log(f"      ⚠ {description} attempt {attempt}/{max_attempts} failed: {e} — retrying in {wait_s}s")
+                    try:
+                        await asyncio.sleep(wait_s)
+                    except asyncio.CancelledError:
+                        raise
+                else:
+                    await self.log(f"      ✗ {description} failed after {max_attempts} attempts: {e}")
+        return False
+
+    def _detect_vision_model(self) -> bool:
+        """Inspect config.json to decide if this is a multimodal/vision model with a projector."""
+        if not self.model_dir:
+            return False
+        config_path = Path(self.model_dir) / "config.json"
+        if not config_path.is_file():
+            return False
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except Exception:
+            return False
+
+        # Most multimodal HF configs expose a nested vision config or tower reference.
+        vision_keys = ("vision_config", "vision_tower", "mm_vision_tower", "image_token_index", "vision_feature_layer")
+        if any(k in config for k in vision_keys):
+            return True
+
+        # Fallback: match known multimodal architecture class names.
+        known_vision_archs = {
+            "LlavaForConditionalGeneration",
+            "LlavaNextForConditionalGeneration",
+            "LlavaNextVideoForConditionalGeneration",
+            "LlavaOnevisionForConditionalGeneration",
+            "Qwen2VLForConditionalGeneration",
+            "Qwen2_5_VLForConditionalGeneration",
+            "Gemma3ForConditionalGeneration",
+            "Llama4ForConditionalGeneration",
+            "MllamaForConditionalGeneration",
+            "InternVLChatModel",
+            "Idefics2ForConditionalGeneration",
+            "Idefics3ForConditionalGeneration",
+            "MiniCPMV",
+            "MiniCPMVForConditionalGeneration",
+            "PaliGemmaForConditionalGeneration",
+            "Phi3VForCausalLM",
+            "SmolVLMForConditionalGeneration",
+        }
+        architectures = config.get("architectures") or []
+        if isinstance(architectures, list) and any(a in known_vision_archs for a in architectures):
+            return True
+
+        return False
+
+    async def _generate_mmproj(self) -> Optional[Path]:
+        """Run convert_hf_to_gguf.py --mmproj to emit the multimodal projector file."""
+        if not self.model_dir or not Path(self.model_dir).exists():
+            await self.log("  ⚠ Cannot generate mmproj: source model directory not available")
+            return None
+
+        convert_script = LLAMA_CPP_DIR / "convert_hf_to_gguf.py"
+        if not convert_script.exists():
+            await self.log(f"  ⚠ Cannot generate mmproj: convert_hf_to_gguf.py missing at {convert_script}")
+            return None
+
+        slug = self.hf_repo_id.replace('/', '-')
+        mmproj_out = CACHE_DIR / f"mmproj-{slug}-f16.gguf"
+        # Remove any stale leftover before running.
+        try:
+            mmproj_out.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+        cmd = [
+            sys.executable, str(convert_script), str(self.model_dir),
+            "--outfile", str(mmproj_out), "--outtype", "f16", "--mmproj",
+        ]
+        await self.log(f"  Running: {' '.join(cmd)}")
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        self.running_processes.append(process)
+        try:
+            async for line in process.stdout:
+                decoded = line.decode(errors="replace").strip()
+                if decoded:
+                    await self.log(f"    {decoded}")
+            returncode = await process.wait()
+        finally:
+            try:
+                self.running_processes.remove(process)
+            except ValueError:
+                pass
+
+        if returncode != 0:
+            await self.log(f"  ⚠ mmproj generation exited with code {returncode}")
+            # Some llama.cpp versions reject --mmproj on certain archs; treat as best-effort.
+            return None
+
+        # llama.cpp may rewrite the output filename (e.g. prefixing with mmproj-). Locate the result.
+        if mmproj_out.exists() and mmproj_out.stat().st_size > 0:
+            return mmproj_out
+
+        candidates = sorted(CACHE_DIR.glob(f"mmproj-*{slug}*.gguf"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if candidates:
+            return candidates[0]
+
+        # Last resort: look inside the source model dir, where the converter sometimes writes by default.
+        try:
+            in_model_dir = sorted(Path(self.model_dir).glob("mmproj-*.gguf"), key=lambda p: p.stat().st_mtime, reverse=True)
+            if in_model_dir:
+                target = CACHE_DIR / in_model_dir[0].name
+                shutil.move(str(in_model_dir[0]), str(target))
+                return target
+        except Exception as e:
+            await self.log(f"  ⚠ mmproj generation produced no output file: {e}")
+            return None
+
+        await self.log("  ⚠ mmproj generation produced no output file")
+        return None
 
     def _get_gguf_shards(self, base_path: Path) -> List[Tuple[int, int, Path]]:
         """Find sharded GGUF files matching a base output path."""
@@ -617,17 +760,17 @@ Full Ollama support is provided by merging any sharded GGUF output into a single
 *Converted automatically by [GGUF Forge](https://gguforge.com) {app_version}*
 
 """
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                None,
+            ok = await self._upload_with_retry(
                 lambda: self.api.upload_file(
                     path_or_fileobj=readme_content.encode('utf-8'),
                     path_in_repo="README.md",
                     repo_id=self.new_repo_id,
                     repo_type="model"
-                )
+                ),
+                description="Status README upload",
             )
-            await self.log("  ✓ Status README uploaded")
+            if ok:
+                await self.log("  ✓ Status README uploaded")
         except Exception as e:
             await self.log(f"  ⚠ Status README upload failed: {e}")
 
@@ -808,7 +951,16 @@ Great news! Your requested GGUF conversion is now complete!
                 if q_path.exists():
                     await self.log(f"Removing quant file: {q_path}")
                     await loop.run_in_executor(None, lambda p=q_path: p.unlink(missing_ok=True))
-            
+
+            # Remove mmproj artifact from cache (skip if it was moved into a local output dir).
+            if self.mmproj_path and self.mmproj_path.exists():
+                try:
+                    if CACHE_DIR in self.mmproj_path.parents:
+                        await self.log(f"Removing mmproj file: {self.mmproj_path}")
+                        await loop.run_in_executor(None, lambda p=self.mmproj_path: p.unlink(missing_ok=True))
+                except Exception as e:
+                    await self.log(f"  ⚠ Failed to remove mmproj: {e}")
+
             await self.log("Cleanup completed.")
         except Exception as e:
             await self.log(f"Cleanup error (non-fatal): {e}")
@@ -962,6 +1114,26 @@ Great news! Your requested GGUF conversion is now complete!
             if fp16_exists and self.resume_mode:
                 await self.log("▶ STEP 3: Conversion SKIPPED (FP16 file exists from previous run)")
                 await self.log(f"  ✓ Using existing FP16 file: {self.fp16_path.name}")
+                # On resume, try to recover an existing mmproj artifact from cache.
+                slug = self.hf_repo_id.replace('/', '-')
+                existing_mmproj = CACHE_DIR / f"mmproj-{slug}-f16.gguf"
+                if existing_mmproj.exists() and existing_mmproj.stat().st_size > 0:
+                    self.is_vision_model = True
+                    self.mmproj_path = existing_mmproj
+                    await self.log(f"  ✓ Found existing mmproj from previous run: {existing_mmproj.name}")
+                elif self.model_dir and Path(self.model_dir).exists():
+                    # Source still available (e.g. local_source mode) — regenerate.
+                    self.is_vision_model = self._detect_vision_model()
+                    if self.is_vision_model:
+                        await self.log("  Vision model detected — regenerating mmproj projector...")
+                        try:
+                            mmproj_path = await self._generate_mmproj()
+                        except Exception as e:
+                            await self.log(f"  ⚠ mmproj generation raised: {e}")
+                            mmproj_path = None
+                        if mmproj_path and mmproj_path.exists() and mmproj_path.stat().st_size > 0:
+                            self.mmproj_path = mmproj_path
+                            await self.log(f"  ✓ mmproj generated: {mmproj_path.name}")
                 await self.log("")
             else:
                 self.start_step("convert")
@@ -994,6 +1166,23 @@ Great news! Your requested GGUF conversion is now complete!
                 await self.log(f"  ✓ FP16 conversion complete: {self.fp16_path.name}")
                 self.end_step("convert")
                 await self.progress(50)
+
+                # 3b. Detect & generate multimodal projector (mmproj) BEFORE deleting safetensors
+                self.check_terminated()
+                self.is_vision_model = self._detect_vision_model()
+                if self.is_vision_model:
+                    await self.log("▶ STEP 3b: Vision model detected — generating mmproj projector...")
+                    try:
+                        mmproj_path = await self._generate_mmproj()
+                    except Exception as e:
+                        await self.log(f"  ⚠ mmproj generation raised: {e}")
+                        mmproj_path = None
+                    if mmproj_path and mmproj_path.exists() and mmproj_path.stat().st_size > 0:
+                        self.mmproj_path = mmproj_path
+                        await self.log(f"  ✓ mmproj generated: {mmproj_path.name}")
+                    else:
+                        await self.log("  ⚠ mmproj generation produced no usable file — continuing without it")
+                    await self.log("")
 
                 # Clean up safetensors immediately - only the GGUF file is needed for quantization
                 await self.cleanup_safetensors()
@@ -1069,7 +1258,46 @@ Great news! Your requested GGUF conversion is now complete!
             
             if self.hf_token and self.new_repo_id:
                 await self.upload_status_readme(quant_base_name, uploaded_files)
-            
+
+            # Upload (or relocate) the mmproj projector for vision models, once, before quants run.
+            if self.mmproj_path and self.mmproj_path.exists():
+                mmproj_name = f"mmproj-{quant_base_name}-f16.gguf"
+                if self.keep_local_only and local_output_dir is not None:
+                    try:
+                        target_path = local_output_dir / mmproj_name
+                        loop = asyncio.get_event_loop()
+                        await loop.run_in_executor(
+                            None, lambda: shutil.move(str(self.mmproj_path), str(target_path))
+                        )
+                        self.mmproj_uploaded_name = mmproj_name
+                        self.mmproj_path = target_path
+                        await self.log(f"  ✓ mmproj saved locally: {target_path}")
+                    except Exception as e:
+                        await self.log(f"  ⚠ Failed to move mmproj to local output: {e}")
+                elif self.hf_token and self.new_repo_id:
+                    file_size = self.mmproj_path.stat().st_size
+                    size_str = f"{file_size / (1024**3):.2f}GB"
+                    await self.update_transfer_progress(mmproj_name, 0, size_str, "Uploading...", "upload")
+                    ok = await self._upload_with_retry(
+                        lambda p=self.mmproj_path, n=mmproj_name: self.api.upload_file(
+                            path_or_fileobj=p,
+                            path_in_repo=n,
+                            repo_id=self.new_repo_id,
+                            repo_type="model"
+                        ),
+                        description="mmproj upload",
+                    )
+                    if ok:
+                        await self.update_transfer_progress(mmproj_name, 100, size_str, "Complete", "upload")
+                        await self.log(f"  ✓ mmproj uploaded to HuggingFace: {mmproj_name}")
+                        self.mmproj_uploaded_name = mmproj_name
+                        # mmproj is kept on disk for resume safety; cache cleanup at end of run handles it.
+                    else:
+                        await self.update_transfer_progress(mmproj_name, -1, size_str, "Failed", "upload")
+                        await self.log(f"  ⚠ mmproj upload abandoned after retries (file kept at {self.mmproj_path})")
+                    self.transfer_files.pop(mmproj_name, None)
+                    await broadcast_transfer_progress(self.model_id, "upload", list(self.transfer_files.values()))
+
             total_quants = len(self.quants_to_run)
             completed_count = len(self.completed_quants)
             
@@ -1161,30 +1389,27 @@ Great news! Your requested GGUF conversion is now complete!
 
                             await self.update_transfer_progress(filename, 0, size_str, "Uploading...", "upload")
 
-                            try:
-                                loop = asyncio.get_event_loop()
-                                await loop.run_in_executor(
-                                    None,
-                                    lambda: self.api.upload_file(
-                                        path_or_fileobj=q_path,
-                                        path_in_repo=filename,
-                                        repo_id=self.new_repo_id,
-                                        repo_type="model"
-                                    )
-                                )
-
-                                await self.update_transfer_progress(filename, 100, size_str, "Complete", "upload")
-                                await self.log(f"      ✓ {q_type} Uploaded to HuggingFace")
-                                uploaded_files.append(q_type)
-
-                                # Save progress to DB for resume capability
-                                await self.save_completed_quant(q_type)
-
-                            except Exception as e:
+                            ok = await self._upload_with_retry(
+                                lambda p=q_path, n=filename: self.api.upload_file(
+                                    path_or_fileobj=p,
+                                    path_in_repo=n,
+                                    repo_id=self.new_repo_id,
+                                    repo_type="model"
+                                ),
+                                description=f"{q_type} upload",
+                            )
+                            if not ok:
                                 await self.update_transfer_progress(filename, -1, size_str, "Failed", "upload")
-                                await self.log(f"      ⚠ {q_type} Upload failed: {e}")
+                                await self.log(f"      ⚠ {q_type} Upload abandoned after retries (file kept for manual recovery: {q_path})")
                                 # Don't delete the file if upload failed - keep for potential manual recovery or retry
                                 return
+
+                            await self.update_transfer_progress(filename, 100, size_str, "Complete", "upload")
+                            await self.log(f"      ✓ {q_type} Uploaded to HuggingFace")
+                            uploaded_files.append(q_type)
+
+                            # Save progress to DB for resume capability
+                            await self.save_completed_quant(q_type)
 
                             # === DELETE QUANT FILE (only after successful upload) ===
                             try:
@@ -1263,11 +1488,32 @@ Great news! Your requested GGUF conversion is now complete!
 This conversion was requested by [@{self.requested_by}](https://huggingface.co/{self.requested_by}).
 """
 
+                # Build mmproj / vision section if a multimodal projector was uploaded
+                mmproj_section = ""
+                vision_tag = ""
+                if self.mmproj_uploaded_name:
+                    vision_tag = "\n- vision"
+                    mmproj_section = f"""
+## Vision / Multimodal (mmproj)
+
+This is a vision-capable model. To use image input with llama.cpp / llama-server, download **both** the language-model quant and the projector file:
+
+- Projector: `{self.mmproj_uploaded_name}`
+
+Example with `llama-server`:
+
+```
+llama-server \\
+  -m {quant_base_name}.Q4_K_M.gguf \\
+  --mmproj {self.mmproj_uploaded_name}
+```
+"""
+
                 readme_content = f"""---
 tags:
 - gguf
 - llama.cpp
-- quantization
+- quantization{vision_tag}
 base_model: {self.hf_repo_id}
 ---
 
@@ -1278,7 +1524,7 @@ This model was converted to GGUF format from [`{self.hf_repo_id}`](https://huggi
 ## Quants
 The following quants are available:
 {', '.join(uploaded_files)}
-
+{mmproj_section}
 ## Ollama Support
 Full Ollama support is provided by merging any sharded GGUF output into a single file after quantization.
 
@@ -1312,17 +1558,19 @@ Full Ollama support is provided by merging any sharded GGUF output into a single
 *Converted automatically by [GGUF Forge](https://gguforge.com) {app_version}*
 
 """
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
-                    None,
+                ok = await self._upload_with_retry(
                     lambda: self.api.upload_file(
                         path_or_fileobj=readme_content.encode('utf-8'),
                         path_in_repo="README.md",
                         repo_id=self.new_repo_id,
                         repo_type="model"
-                    )
+                    ),
+                    description="Final README upload",
                 )
-                await self.log(f"  ✓ README uploaded")
+                if ok:
+                    await self.log(f"  ✓ README uploaded")
+                else:
+                    await self.log(f"  ⚠ README upload failed after retries")
                 await self.log("")
 
                 # Notify the requester via HuggingFace discussion
