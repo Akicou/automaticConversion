@@ -47,6 +47,104 @@ def get_quants_list():
     return QUANTS
 
 
+def get_cache_dir():
+    """Return the configured CACHE_DIR (set via set_workflow_config)."""
+    return CACHE_DIR
+
+
+# File extensions counted as model weights for size/detection purposes.
+_MODEL_WEIGHT_EXTS = (".safetensors", ".bin", ".pt", ".pth")
+
+
+def _has_safetensors(directory: Path) -> bool:
+    try:
+        return any(directory.glob("*.safetensors"))
+    except OSError:
+        return False
+
+
+def _is_hf_model_dir(directory: Path) -> bool:
+    """A directory looks like an HF model snapshot if it has config.json + safetensors."""
+    try:
+        return (directory / "config.json").is_file() and _has_safetensors(directory)
+    except OSError:
+        return False
+
+
+def _model_dir_stats(directory: Path) -> Tuple[int, int]:
+    """Sum size of weight files (bytes) and total file count in directory."""
+    total_size = 0
+    file_count = 0
+    try:
+        for entry in directory.iterdir():
+            if not entry.is_file():
+                continue
+            file_count += 1
+            if entry.suffix.lower() in _MODEL_WEIGHT_EXTS:
+                try:
+                    total_size += entry.stat().st_size
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return total_size, file_count
+
+
+def scan_local_models(cache_dir: Optional[Path] = None) -> list:
+    """Scan CACHE_DIR for already-downloaded HuggingFace models.
+
+    Detects two layouts:
+      - HF org/repo: cache_dir/{org}/{repo}/  (config.json + *.safetensors)
+      - Flat:       cache_dir/{name}/        (config.json + *.safetensors)
+
+    Returns a list of dicts: {repo_id, path, size_bytes, file_count, layout}.
+    """
+    base = Path(cache_dir) if cache_dir is not None else CACHE_DIR
+    if base is None or not base.exists():
+        return []
+
+    results = []
+    try:
+        top_entries = sorted(p for p in base.iterdir() if p.is_dir())
+    except OSError:
+        return []
+
+    for top in top_entries:
+        # HF org/repo layout: top is the org, subdirs are repos.
+        hf_matches = []
+        try:
+            for sub in sorted(p for p in top.iterdir() if p.is_dir()):
+                if _is_hf_model_dir(sub):
+                    hf_matches.append(sub)
+        except OSError:
+            pass
+
+        if hf_matches:
+            for sub in hf_matches:
+                size, count = _model_dir_stats(sub)
+                results.append({
+                    "repo_id": f"{top.name}/{sub.name}",
+                    "path": str(sub.resolve()),
+                    "size_bytes": size,
+                    "file_count": count,
+                    "layout": "hf",
+                })
+            continue
+
+        # Flat layout: the top-level dir itself is the model.
+        if _is_hf_model_dir(top):
+            size, count = _model_dir_stats(top)
+            results.append({
+                "repo_id": f"local/{top.name}",
+                "path": str(top.resolve()),
+                "size_bytes": size,
+                "file_count": count,
+                "layout": "flat",
+            })
+
+    return results
+
+
 async def get_quant_priority_order():
     """Get the priority order for quants from database. Returns default if not configured."""
     from database import get_db_connection
@@ -245,7 +343,8 @@ class ModelWorkflow:
     def __init__(self, model_id: str, hf_repo_id: str, resume_mode: bool = False,
                  completed_quants: Optional[List[str]] = None, quants_to_run: Optional[List[str]] = None,
                  ignore_space_check: bool = False, force_llama_update: bool = False,
-                 enable_shard_merging: bool = True, requested_by: Optional[str] = None):
+                 enable_shard_merging: bool = True, requested_by: Optional[str] = None,
+                 local_source_path: Optional[str] = None, keep_local_only: bool = False):
         self.model_id = model_id
         self.hf_repo_id = hf_repo_id
         self.log_buffer = []
@@ -278,7 +377,11 @@ class ModelWorkflow:
         self.enable_shard_merging = enable_shard_merging
         # Who requested this conversion (HuggingFace username)
         self.requested_by = requested_by
-    
+        # Local-source mode: skip download, never delete the source dir
+        self.local_source_path = local_source_path
+        # If True, skip HF upload and move quantized GGUFs into <local_source_path>/gguf/
+        self.keep_local_only = keep_local_only
+
     async def terminate(self):
         """Request termination of this workflow."""
         self.terminated = True
@@ -334,6 +437,9 @@ class ModelWorkflow:
     
     async def cleanup_safetensors(self):
         """Remove downloaded safetensors model directory to free up space."""
+        if self.local_source_path:
+            await self.log("  ℹ Local source detected — keeping original safetensors")
+            return
         if self.model_dir and Path(self.model_dir).exists():
             await self.log("  Cleaning up safetensors model to free disk space...")
             loop = asyncio.get_event_loop()
@@ -685,8 +791,10 @@ Great news! Your requested GGUF conversion is now complete!
         await self.log("Starting cleanup...")
         loop = asyncio.get_event_loop()
         try:
-            # Remove downloaded model directory
-            if self.model_dir and Path(self.model_dir).exists():
+            # Remove downloaded model directory (NEVER delete a user-provided local source)
+            if self.local_source_path:
+                await self.log(f"Preserving local source: {self.local_source_path}")
+            elif self.model_dir and Path(self.model_dir).exists():
                 await self.log(f"Removing downloaded model: {self.model_dir}")
                 await loop.run_in_executor(None, lambda: shutil.rmtree(self.model_dir, ignore_errors=True))
             
@@ -743,11 +851,26 @@ Great news! Your requested GGUF conversion is now complete!
             self.fp16_path = CACHE_DIR / f"{self.hf_repo_id.replace('/', '-')}-f16.gguf"
             fp16_exists = self.fp16_path.exists() and self.fp16_path.stat().st_size > 0
 
-            # 2. Download (skip if FP16 already exists)
+            # 2. Download (skip if FP16 already exists, or use local source)
             self.check_terminated()
             if fp16_exists and self.resume_mode:
                 await self.log("▶ STEP 2: Download SKIPPED (FP16 file exists from previous run)")
                 await self.log(f"  ✓ Using existing FP16 file: {self.fp16_path.name}")
+                await self.log("")
+            elif self.local_source_path:
+                self.start_step("download")
+                await self.status("downloading")
+                await self.log("▶ STEP 2: Using local model (no download needed)")
+                await self.log(f"  Source: {self.local_source_path}")
+                local_path = Path(self.local_source_path)
+                if not local_path.exists():
+                    raise Exception(f"Local source path does not exist: {self.local_source_path}")
+                if not (local_path / "config.json").is_file():
+                    raise Exception(f"Local source missing config.json: {self.local_source_path}")
+                self.model_dir = str(local_path)
+                await self.log(f"  ✓ Local source ready (originals will be preserved)")
+                self.end_step("download")
+                await self.progress(30)
                 await self.log("")
             else:
                 self.start_step("download")
@@ -883,11 +1006,25 @@ Great news! Your requested GGUF conversion is now complete!
             await self.log("▶ STEP 4: Quantizing and uploading each format...")
             quant_base_name = self.hf_repo_id.split("/")[-1]
             self.hf_token = os.getenv("HF_TOKEN")
-            
+
             # Get current user's HuggingFace username to create repo under their account
             self.api = HfApi(token=self.hf_token)
-            
-            if self.hf_token:
+
+            # Local-only mode: prepare output directory inside the source folder, skip HF upload
+            local_output_dir = None
+            if self.keep_local_only:
+                if not self.local_source_path:
+                    await self.log("  ⚠ keep_local_only requires a local source — falling back to upload mode")
+                    self.keep_local_only = False
+                else:
+                    local_output_dir = Path(self.local_source_path) / "gguf"
+                    local_output_dir.mkdir(parents=True, exist_ok=True)
+                    await self.log(f"  Local-only mode: outputs will be saved to {local_output_dir}")
+
+            if self.keep_local_only:
+                # Skip HF repo creation entirely
+                self.new_repo_id = None
+            elif self.hf_token:
                 try:
                     loop = asyncio.get_event_loop()
                     user_info = await loop.run_in_executor(None, self.api.whoami)
@@ -999,16 +1136,31 @@ Great news! Your requested GGUF conversion is now complete!
                             return
                         q_path = merged_path
                         
-                        # === UPLOAD ===
-                        if self.hf_token and self.new_repo_id:
+                        # === UPLOAD or KEEP-LOCAL ===
+                        if self.keep_local_only and local_output_dir is not None:
                             self.check_terminated()
-                            
+                            filename = f"{quant_base_name}.{q_type}.gguf"
+                            target_path = local_output_dir / filename
+                            try:
+                                loop = asyncio.get_event_loop()
+                                await loop.run_in_executor(
+                                    None, lambda: shutil.move(str(q_path), str(target_path))
+                                )
+                                await self.log(f"      ✓ {q_type} Saved locally: {target_path}")
+                                uploaded_files.append(q_type)
+                                await self.save_completed_quant(q_type)
+                            except Exception as e:
+                                await self.log(f"      ⚠ {q_type} Failed to move to local output: {e}")
+                                return
+                        elif self.hf_token and self.new_repo_id:
+                            self.check_terminated()
+
                             filename = f"{quant_base_name}.{q_type}.gguf"
                             file_size = q_path.stat().st_size if q_path.exists() else 0
                             size_str = f"{file_size / (1024**3):.2f}GB" if file_size > 0 else ""
-                            
+
                             await self.update_transfer_progress(filename, 0, size_str, "Uploading...", "upload")
-                            
+
                             try:
                                 loop = asyncio.get_event_loop()
                                 await loop.run_in_executor(
@@ -1020,29 +1172,34 @@ Great news! Your requested GGUF conversion is now complete!
                                         repo_type="model"
                                     )
                                 )
-                                
+
                                 await self.update_transfer_progress(filename, 100, size_str, "Complete", "upload")
                                 await self.log(f"      ✓ {q_type} Uploaded to HuggingFace")
                                 uploaded_files.append(q_type)
-                                
+
                                 # Save progress to DB for resume capability
                                 await self.save_completed_quant(q_type)
-                                
+
                             except Exception as e:
                                 await self.update_transfer_progress(filename, -1, size_str, "Failed", "upload")
                                 await self.log(f"      ⚠ {q_type} Upload failed: {e}")
                                 # Don't delete the file if upload failed - keep for potential manual recovery or retry
                                 return
+
+                            # === DELETE QUANT FILE (only after successful upload) ===
+                            try:
+                                loop = asyncio.get_event_loop()
+                                await loop.run_in_executor(None, lambda: q_path.unlink(missing_ok=True))
+                            except Exception as e:
+                                await self.log(f"      ⚠ {q_type} Failed to delete: {e}")
                         else:
                             await self.log(f"      ℹ {q_type} Skipping upload (no HF token)")
                             uploaded_files.append(q_type)
-                        
-                        # === DELETE QUANT FILE ===
-                        try:
-                            loop = asyncio.get_event_loop()
-                            await loop.run_in_executor(None, lambda: q_path.unlink(missing_ok=True))
-                        except Exception as e:
-                            await self.log(f"      ⚠ {q_type} Failed to delete: {e}")
+                            try:
+                                loop = asyncio.get_event_loop()
+                                await loop.run_in_executor(None, lambda: q_path.unlink(missing_ok=True))
+                            except Exception as e:
+                                await self.log(f"      ⚠ {q_type} Failed to delete: {e}")
                         
                         # Clear transfer progress for this file
                         self.transfer_files.pop(f"{quant_base_name}.{q_type}.gguf", None)

@@ -562,7 +562,9 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
             ignore_space_check INTEGER DEFAULT 0,
             quants_to_run TEXT DEFAULT '',
             enable_shard_merging INTEGER DEFAULT 1,
-            requested_by TEXT
+            requested_by TEXT,
+            local_source_path TEXT,
+            keep_local_only INTEGER DEFAULT 0
         )
     ''')
     
@@ -593,6 +595,18 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
     # Migration: Add requested_by column if it doesn't exist
     try:
         await conn.execute("ALTER TABLE models ADD COLUMN requested_by TEXT")
+    except:
+        pass  # Column already exists
+
+    # Migration: Add local_source_path column if it doesn't exist
+    try:
+        await conn.execute("ALTER TABLE models ADD COLUMN local_source_path TEXT")
+    except:
+        pass  # Column already exists
+
+    # Migration: Add keep_local_only column if it doesn't exist
+    try:
+        await conn.execute("ALTER TABLE models ADD COLUMN keep_local_only INTEGER DEFAULT 0")
     except:
         pass  # Column already exists
 
@@ -729,7 +743,9 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
             ignore_space_check BIT DEFAULT 0,
             quants_to_run NVARCHAR(MAX) DEFAULT '',
             enable_shard_merging BIT DEFAULT 1,
-            requested_by NVARCHAR(255)
+            requested_by NVARCHAR(255),
+            local_source_path NVARCHAR(MAX),
+            keep_local_only BIT DEFAULT 0
         )
     ''')
     await conn.commit()
@@ -779,6 +795,26 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
         await conn.execute('''
             IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'requested_by')
             ALTER TABLE models ADD requested_by NVARCHAR(255)
+        ''')
+        await conn.commit()
+    except:
+        pass
+
+    # Migration: Add local_source_path column if it doesn't exist
+    try:
+        await conn.execute('''
+            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'local_source_path')
+            ALTER TABLE models ADD local_source_path NVARCHAR(MAX)
+        ''')
+        await conn.commit()
+    except:
+        pass
+
+    # Migration: Add keep_local_only column if it doesn't exist
+    try:
+        await conn.execute('''
+            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'keep_local_only')
+            ALTER TABLE models ADD keep_local_only BIT DEFAULT 0
         ''')
         await conn.commit()
     except:

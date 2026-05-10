@@ -46,3 +46,13 @@ class CreateTicketRequest(BaseModel):
 class ContinueRequestBody(BaseModel):
     """Admin options when continuing an interrupted job."""
     ignore_space_check: Optional[bool] = False  # If True, bypass conservative disk space checks
+
+
+class LocalProcessRequest(BaseModel):
+    """Admin: quantize an already-downloaded model from disk."""
+    path: str  # Absolute path to the model directory (must be inside CACHE_DIR)
+    repo_id: str  # Used as the synthetic hf_repo_id for tracking (e.g., "org/repo" or "local/name")
+    quants: Optional[List[str]] = None
+    keep_local_only: Optional[bool] = False  # If True, skip HF upload and write GGUFs into <path>/gguf/
+    ignore_space_check: Optional[bool] = False
+    enable_shard_merging: Optional[bool] = True

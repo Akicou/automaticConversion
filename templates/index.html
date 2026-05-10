@@ -549,6 +549,24 @@
         </div>
     </div>
 
+    <!-- Admin: Local Models -->
+    {% if role == 'admin' %}
+    <div style="margin-bottom: 3rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+            <h2 style="font-weight: 400; font-size: 1.2rem; color: var(--text-secondary); margin: 0;">Local Models</h2>
+            <button onclick="loadLocalModels()"
+                style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">Rescan</button>
+        </div>
+        <div id="local-models-cache-dir"
+            style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.75rem; font-family: monospace; opacity: 0.7;"></div>
+        <div id="local-models-list" style="display: grid; gap: 0.75rem;">
+            <div
+                style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">
+                Loading...</div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Admin: Pending Requests -->
     {% if role == 'admin' %}
     <div style="margin-bottom: 3rem;">
@@ -1169,6 +1187,114 @@
 
     // Load quants on page load
     loadAvailableQuants();
+
+    // ====== LOCAL MODELS (Admin only) ======
+    function formatBytes(bytes) {
+        if (!bytes) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let i = 0;
+        let size = bytes;
+        while (size >= 1024 && i < units.length - 1) {
+            size /= 1024;
+            i++;
+        }
+        return size.toFixed(i === 0 ? 0 : 2) + ' ' + units[i];
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    async function loadLocalModels() {
+        if (!isAdmin) return;
+        const container = document.getElementById('local-models-list');
+        const cacheDirEl = document.getElementById('local-models-cache-dir');
+        if (!container) return;
+        container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1rem; font-size: 0.85rem;">Scanning…</div>';
+        try {
+            const res = await fetch('/api/models/local');
+            if (!res.ok) {
+                container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">Failed to scan local models.</div>';
+                return;
+            }
+            const data = await res.json();
+            if (cacheDirEl) {
+                cacheDirEl.textContent = data.cache_dir ? ('Scanned: ' + data.cache_dir) : '';
+            }
+            const models = data.models || [];
+            if (models.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">No local models found in CACHE_DIR.</div>';
+                return;
+            }
+            container.innerHTML = '';
+            models.forEach((m, idx) => {
+                const card = document.createElement('div');
+                card.className = 'glass-panel';
+                card.style.cssText = 'padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem;';
+                const layoutBadge = m.layout === 'flat'
+                    ? '<span style="font-size: 0.65rem; padding: 0.1rem 0.4rem; border: 1px solid var(--glass-border); border-radius: 4px; color: var(--text-secondary);">flat</span>'
+                    : '<span style="font-size: 0.65rem; padding: 0.1rem 0.4rem; border: 1px solid var(--glass-border); border-radius: 4px; color: var(--text-secondary);">hf</span>';
+                card.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-family: monospace; font-size: 0.95rem; color: var(--text-primary);">${escapeHtml(m.repo_id)}</span>
+                        ${layoutBadge}
+                        <span style="margin-left: auto; font-size: 0.75rem; color: var(--text-secondary);">${formatBytes(m.size_bytes)} · ${m.file_count} files</span>
+                    </div>
+                    <div style="font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; opacity: 0.7; word-break: break-all;">${escapeHtml(m.path)}</div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.25rem;">
+                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-secondary);">
+                            <input type="checkbox" id="local-keep-${idx}" checked style="accent-color: var(--success);">
+                            Keep local only (don't upload)
+                        </label>
+                        <button class="primary" onclick="quantizeLocal(${idx})" style="padding: 0.4rem 0.9rem; font-size: 0.85rem;">Quantize</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            window.__localModels = models;
+        } catch (e) {
+            console.error('loadLocalModels failed', e);
+            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem; border: 1px dashed var(--glass-border); border-radius: 8px; font-size: 0.9rem;">Failed to scan local models.</div>';
+        }
+    }
+
+    async function quantizeLocal(idx) {
+        if (!isAdmin) return;
+        const m = (window.__localModels || [])[idx];
+        if (!m) return;
+        const keepEl = document.getElementById('local-keep-' + idx);
+        const keepLocalOnly = keepEl ? keepEl.checked : true;
+        const selectedQuants = getSelectedQuants();
+        try {
+            const res = await fetch('/api/models/process-local', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    path: m.path,
+                    repo_id: m.repo_id,
+                    quants: selectedQuants.length > 0 ? selectedQuants : null,
+                    keep_local_only: keepLocalOnly,
+                    ignore_space_check: false,
+                    enable_shard_merging: true
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert('Failed to queue: ' + (data.detail || res.statusText));
+                return;
+            }
+            // The status board picks up the new row via WebSocket; nothing else to do here.
+        } catch (e) {
+            console.error('quantizeLocal failed', e);
+            alert('Failed to queue local model: ' + e.message);
+        }
+    }
+
+    if (typeof isAdmin !== 'undefined' && isAdmin) {
+        loadLocalModels();
+    }
 
     // ====== APP UPDATE SYSTEM (Admin only) ======
     let updateAvailable = false;

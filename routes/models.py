@@ -8,9 +8,18 @@ import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 
+from pathlib import Path
+
 from database import get_db_connection
-from models import ProcessRequest, ContinueRequestBody
-from workflow import ModelWorkflow, running_workflows, get_quants_list, get_model_queue
+from models import ProcessRequest, ContinueRequestBody, LocalProcessRequest
+from workflow import (
+    ModelWorkflow,
+    running_workflows,
+    get_quants_list,
+    get_model_queue,
+    get_cache_dir,
+    scan_local_models,
+)
 from managers import HuggingFaceManager, LlamaCppManager
 
 router = APIRouter(prefix="/api")
@@ -164,6 +173,118 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
         background_tasks.add_task(workflow.run_pipeline)
     
     return {"status": "queued", "id": new_id, "quants": quants_to_run}
+
+
+@router.get("/models/local")
+async def list_local_models(user = Depends(get_admin)):
+    """Admin only: scan CACHE_DIR for already-downloaded HuggingFace models."""
+    cache_dir = get_cache_dir()
+    if cache_dir is None:
+        return {"cache_dir": None, "models": []}
+    models_found = scan_local_models(cache_dir)
+    return {"cache_dir": str(cache_dir), "models": models_found}
+
+
+@router.post("/models/process-local")
+async def process_local_model(req: LocalProcessRequest, background_tasks: BackgroundTasks, user = Depends(get_admin)):
+    """Admin only: quantize an already-downloaded model from disk.
+
+    The source safetensors directory is preserved across the workflow.
+    """
+    cache_dir = get_cache_dir()
+    if cache_dir is None:
+        raise HTTPException(status_code=500, detail="CACHE_DIR not configured")
+
+    # Path-traversal guard: resolve and require it to be inside CACHE_DIR.
+    try:
+        resolved = Path(req.path).resolve()
+        cache_resolved = Path(cache_dir).resolve()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid path: {e}")
+
+    try:
+        resolved.relative_to(cache_resolved)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Path must be inside the configured models directory")
+
+    if not resolved.is_dir():
+        raise HTTPException(status_code=400, detail=f"Not a directory: {resolved}")
+    if not (resolved / "config.json").is_file():
+        raise HTTPException(status_code=400, detail="Missing config.json — not a HuggingFace model directory")
+    if not any(resolved.glob("*.safetensors")):
+        raise HTTPException(status_code=400, detail="No *.safetensors files found in directory")
+
+    repo_id = (req.repo_id or "").strip()
+    if not repo_id or "/" not in repo_id:
+        raise HTTPException(status_code=400, detail="repo_id must be in 'owner/name' form (use 'local/<name>' for flat layouts)")
+
+    # Validate and process quants
+    available_quants = get_quants_list()
+    if req.quants:
+        quants_to_run = validate_quants(req.quants)
+        if not quants_to_run:
+            raise HTTPException(status_code=400, detail="No valid quants specified")
+    else:
+        quants_to_run = available_quants
+
+    conn = await get_db_connection()
+    await conn.execute("SELECT * FROM models WHERE hf_repo_id = ?", (repo_id,))
+    existing = await conn.fetchone()
+
+    if existing and existing['status'] in ['pending', 'downloading', 'converting', 'quantizing', 'initializing']:
+        await conn.close()
+        raise HTTPException(status_code=400, detail="Model already processing")
+
+    if existing:
+        await conn.execute("DELETE FROM models WHERE hf_repo_id = ?", (repo_id,))
+
+    new_id = str(uuid.uuid4())
+    quants_msg = ', '.join(quants_to_run) if len(quants_to_run) < len(available_quants) else 'all quants'
+    keep_local = bool(req.keep_local_only)
+    log_msg = f"Queued (local source). Quants: {quants_msg}. Keep local only: {keep_local}"
+    if req.ignore_space_check:
+        log_msg += "\n⚠ Admin override: Space check disabled"
+    if not req.enable_shard_merging:
+        log_msg += "\n⚠ Admin override: Shard merging disabled"
+
+    await conn.execute(
+        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, quants_to_run, "
+        "ignore_space_check, enable_shard_merging, local_source_path, keep_local_only) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            new_id,
+            repo_id,
+            "pending",
+            0,
+            log_msg,
+            "",
+            json.dumps(quants_to_run),
+            1 if req.ignore_space_check else 0,
+            1 if req.enable_shard_merging else 0,
+            str(resolved),
+            1 if keep_local else 0,
+        )
+    )
+    await conn.commit()
+    await conn.close()
+
+    workflow = ModelWorkflow(
+        new_id,
+        repo_id,
+        quants_to_run=quants_to_run,
+        ignore_space_check=bool(req.ignore_space_check),
+        enable_shard_merging=bool(req.enable_shard_merging),
+        local_source_path=str(resolved),
+        keep_local_only=keep_local,
+    )
+
+    queue = get_model_queue()
+    if queue:
+        await queue.add(workflow)
+    else:
+        background_tasks.add_task(workflow.run_pipeline)
+
+    return {"status": "queued", "id": new_id, "quants": quants_to_run, "keep_local_only": keep_local}
 
 
 @router.get("/status/all")
