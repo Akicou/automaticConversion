@@ -38,7 +38,7 @@ def configure(tmpl: Jinja2Templates, pwd_ctx: CryptContext, client_id: str, clie
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html")
 
 
 @router.post("/login")
@@ -60,7 +60,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
         )
         return response
     
-    return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
+    return templates.TemplateResponse(request, "login.html", {"error": "Invalid credentials"})
 
 
 @router.get("/logout")
