@@ -1,83 +1,104 @@
 {% extends "base.html" %}
 
-{% block title %}Settings - GGUF Forge{% endblock %}
+{% block title %}Settings — GGUF Forge{% endblock %}
 
 {% block head %}
 <style>
 .settings-container {
-    max-width: 800px;
+    max-width: 720px;
     margin: 0 auto;
-    padding: 2rem 1rem;
 }
 
-.settings-header {
+.page-header {
     margin-bottom: 2rem;
 }
 
-.settings-header h1 {
-    font-size: 2rem;
+.page-header h1 {
+    font-size: 1.6rem;
     font-weight: 600;
-    margin-bottom: 0.5rem;
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
 }
 
-.settings-header p {
+.page-header p {
+    margin: 0;
     color: var(--text-secondary);
+    font-size: 0.9rem;
 }
 
 .settings-section {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+    transition: border-color 0.15s ease;
+}
+
+.settings-section:hover {
+    border-color: var(--card-border-hover);
 }
 
 .settings-section h2 {
-    font-size: 1.25rem;
-    font-weight: 500;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border-color);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+
+.settings-section .section-desc {
+    font-size: 0.825rem;
+    color: var(--text-tertiary);
+    margin: 0 0 1rem;
 }
 
 .setting-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border-color);
+    padding: 0.85rem 0;
+    border-top: 1px solid var(--border-color);
+    gap: 1rem;
 }
 
-.setting-item:last-child {
-    border-bottom: none;
+.setting-item:first-of-type {
+    border-top: none;
+    padding-top: 0;
 }
 
 .setting-info {
     flex: 1;
+    min-width: 0;
 }
 
 .setting-info h3 {
-    font-size: 1rem;
+    font-size: 0.875rem;
     font-weight: 500;
-    margin-bottom: 0.25rem;
+    margin: 0 0 0.2rem;
+    color: var(--text-primary);
 }
 
 .setting-info p {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    margin: 0;
 }
 
 .setting-control {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
+    flex-shrink: 0;
 }
 
 /* Toggle switch */
 .toggle-switch {
     position: relative;
-    width: 48px;
-    height: 24px;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
 }
 
 .toggle-switch input {
@@ -89,186 +110,216 @@
 .toggle-slider {
     position: absolute;
     cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background-color: var(--bg-tertiary);
-    transition: 0.3s;
-    border-radius: 24px;
+    border: 1px solid var(--border-color);
+    transition: 0.2s var(--ease-out);
+    border-radius: 999px;
 }
 
-.toggle-slider:before {
+.toggle-slider::before {
     position: absolute;
     content: "";
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    top: 2px;
     background-color: var(--text-secondary);
-    transition: 0.3s;
+    transition: 0.2s var(--ease-out);
     border-radius: 50%;
 }
 
 .toggle-switch input:checked + .toggle-slider {
-    background-color: var(--accent-primary);
+    background-color: var(--text-primary);
+    border-color: var(--text-primary);
 }
 
-.toggle-switch input:checked + .toggle-slider:before {
-    transform: translateX(24px);
-    background-color: white;
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(16px);
+    background-color: var(--bg-primary);
 }
 
-/* Select dropdown */
+/* Select */
 select.setting-select {
-    padding: 0.5rem 2rem 0.5rem 1rem;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
+    padding: 0.4rem 0.75rem;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
     border-radius: 6px;
     color: var(--text-primary);
-    font-size: 0.875rem;
+    font-size: 0.825rem;
+    font-family: inherit;
     cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+select.setting-select:hover {
+    border-color: var(--border-hover);
 }
 
 /* Range slider */
 input[type="range"].setting-range {
-    width: 200px;
-    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 180px;
+    height: 4px;
     background: var(--bg-tertiary);
-    border-radius: 3px;
+    border-radius: 999px;
     outline: none;
+    cursor: pointer;
 }
 
 input[type="range"].setting-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
     appearance: none;
-    width: 18px;
-    height: 18px;
-    background: var(--accent-primary);
+    width: 14px;
+    height: 14px;
+    background: var(--text-primary);
     border-radius: 50%;
     cursor: pointer;
+    border: 2px solid var(--bg-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 input[type="range"].setting-range::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: var(--accent-primary);
-    border: none;
+    width: 14px;
+    height: 14px;
+    background: var(--text-primary);
+    border: 2px solid var(--bg-primary);
     border-radius: 50%;
     cursor: pointer;
 }
 
-/* Quant checkboxes */
+#refresh-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    min-width: 30px;
+}
+
+/* Quant grid */
 .quant-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.4rem;
+    margin-top: 0.85rem;
 }
 
 .quant-checkbox-item {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem;
-    background: var(--bg-primary);
+    padding: 0.5rem 0.65rem;
+    background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .quant-checkbox-item:hover {
+    background: var(--bg-tertiary);
     border-color: var(--border-hover);
 }
 
 .quant-checkbox-item input[type="checkbox"] {
     cursor: pointer;
+    accent-color: var(--text-primary);
+    margin: 0;
 }
 
 .quant-checkbox-item label {
     cursor: pointer;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.settings-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    gap: 0.5rem;
 }
 
 .save-button {
-    background: var(--accent-primary);
-    color: white;
-    border: none;
-    padding: 0.75rem 2rem;
+    background: var(--primary);
+    color: var(--text-on-primary);
+    border: 1px solid var(--primary);
+    padding: 0.5rem 1.1rem;
     border-radius: 6px;
-    font-size: 1rem;
+    font-size: 0.85rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.15s ease, opacity 0.15s ease;
+    letter-spacing: -0.005em;
 }
 
 .save-button:hover {
-    background: var(--accent-hover);
+    background: var(--primary-hover);
 }
 
 .save-button:disabled {
-    opacity: 0.6;
+    opacity: 0.55;
     cursor: not-allowed;
 }
 
 @media (max-width: 768px) {
+    .settings-section { padding: 1rem 1.1rem; }
+
     .setting-item {
         flex-direction: column;
         align-items: flex-start;
-        gap: 1rem;
+        gap: 0.65rem;
     }
 
     .setting-control {
         width: 100%;
-        justify-content: flex-end;
+        justify-content: flex-start;
     }
 
-    input[type="range"].setting-range {
-        width: 100%;
-    }
-
-    .quant-grid {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    }
+    input[type="range"].setting-range { width: 100%; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="settings-container">
-    <div class="settings-header">
-        <h1>⚙️ Settings</h1>
-        <p>Customize your GGUF Forge experience</p>
+    <div class="page-header">
+        <h1>Settings</h1>
+        <p>Customize your GGUF Forge experience.</p>
     </div>
 
     <form id="settings-form" onsubmit="saveSettings(event)">
-        <!-- Appearance Section -->
+        <!-- Appearance -->
         <div class="settings-section">
-            <h2>🎨 Appearance</h2>
+            <h2>Appearance</h2>
+            <p class="section-desc">Choose how GGUF Forge looks to you.</p>
 
             <div class="setting-item">
                 <div class="setting-info">
                     <h3>Theme</h3>
-                    <p>Choose your preferred color scheme</p>
+                    <p>Switch between dark, light, or follow your system.</p>
                 </div>
                 <div class="setting-control">
                     <select id="theme" class="setting-select">
                         <option value="dark">Dark</option>
                         <option value="light">Light</option>
-                        <option value="auto">Auto (System)</option>
+                        <option value="auto">System</option>
                     </select>
                 </div>
             </div>
         </div>
 
-        <!-- Notifications Section -->
+        <!-- Notifications -->
         <div class="settings-section">
-            <h2>🔔 Notifications</h2>
+            <h2>Notifications</h2>
+            <p class="section-desc">Control in-app notifications.</p>
 
             <div class="setting-item">
                 <div class="setting-info">
-                    <h3>Enable Notifications</h3>
-                    <p>Show toast notifications for updates</p>
+                    <h3>Toast notifications</h3>
+                    <p>Show notifications when conversion status changes.</p>
                 </div>
                 <div class="setting-control">
                     <label class="toggle-switch">
@@ -279,30 +330,23 @@ input[type="range"].setting-range::-moz-range-thumb {
             </div>
         </div>
 
-        <!-- Default Quantization Section -->
+        <!-- Default Quantization -->
         <div class="settings-section">
-            <h2>📊 Default Quantization Types</h2>
+            <h2>Default quantization</h2>
+            <p class="section-desc">Pre-select these quantization formats when starting a conversion.</p>
 
-            <div class="setting-item">
-                <div class="setting-info">
-                    <h3>Preselected Quants</h3>
-                    <p>Choose which quantization types to select by default</p>
-                </div>
-            </div>
-
-            <div class="quant-grid" id="quant-grid">
-                <!-- Quant checkboxes will be populated by JavaScript -->
-            </div>
+            <div class="quant-grid" id="quant-grid"></div>
         </div>
 
-        <!-- Advanced Section -->
+        <!-- Advanced -->
         <div class="settings-section">
-            <h2>🔧 Advanced</h2>
+            <h2>Advanced</h2>
+            <p class="section-desc">Fine-tune dashboard behaviour.</p>
 
             <div class="setting-item">
                 <div class="setting-info">
-                    <h3>Auto-Refresh Interval</h3>
-                    <p>How often to refresh the dashboard (seconds)</p>
+                    <h3>Auto-refresh interval</h3>
+                    <p>How often the dashboard refreshes data.</p>
                 </div>
                 <div class="setting-control">
                     <input type="range" id="auto_refresh_interval" class="setting-range" min="10" max="120" step="10" value="30" oninput="updateRefreshLabel(this.value)">
@@ -311,9 +355,8 @@ input[type="range"].setting-range::-moz-range-thumb {
             </div>
         </div>
 
-        <!-- Save Button -->
-        <div style="text-align: right; margin-top: 2rem;">
-            <button type="submit" class="save-button">Save Settings</button>
+        <div class="settings-actions">
+            <button type="submit" class="save-button">Save changes</button>
         </div>
     </form>
 </div>
@@ -322,16 +365,13 @@ input[type="range"].setting-range::-moz-range-thumb {
 let currentSettings = {};
 let availableQuants = [];
 
-// Load settings and quants on page load
 async function loadSettings() {
     try {
-        // Load available quants
         const quantsRes = await fetch('/api/settings/quants');
         const quantsData = await quantsRes.json();
         availableQuants = quantsData.quants;
         renderQuantCheckboxes();
 
-        // Load user settings
         const user = '{{ user }}';
         if (user && user !== 'None') {
             const settingsRes = await fetch(`/api/settings/user/${user}`);
@@ -355,20 +395,16 @@ function renderQuantCheckboxes() {
 }
 
 function applySettingsToForm() {
-    // Theme
     if (currentSettings.theme) {
         document.getElementById('theme').value = currentSettings.theme;
     }
 
-    // Notifications
     document.getElementById('notifications_enabled').checked = currentSettings.notifications_enabled !== false;
 
-    // Auto refresh interval
     const interval = currentSettings.auto_refresh_interval || 30;
     document.getElementById('auto_refresh_interval').value = interval;
     updateRefreshLabel(interval);
 
-    // Default quants
     if (currentSettings.default_quants && Array.isArray(currentSettings.default_quants)) {
         currentSettings.default_quants.forEach(quant => {
             const checkbox = document.getElementById(`quant-${quant}`);
@@ -386,10 +422,9 @@ async function saveSettings(event) {
 
     const submitBtn = document.querySelector('.save-button');
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Saving...';
+    submitBtn.textContent = 'Saving…';
 
     try {
-        // Collect form data
         const selectedQuants = availableQuants.filter(quant =>
             document.getElementById(`quant-${quant}`).checked
         );
@@ -407,7 +442,6 @@ async function saveSettings(event) {
             return;
         }
 
-        // Save settings
         const res = await fetch(`/api/settings/user/${user}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -415,9 +449,8 @@ async function saveSettings(event) {
         });
 
         if (res.ok) {
-            showToast('success', 'Settings saved successfully!');
+            showToast('success', 'Settings saved');
 
-            // Apply theme immediately if changed
             if (settings.theme && settings.theme !== 'auto') {
                 themeManager.applyTheme(settings.theme);
             }
@@ -430,11 +463,10 @@ async function saveSettings(event) {
         showToast('error', 'Failed to save settings');
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Save Settings';
+        submitBtn.textContent = 'Save changes';
     }
 }
 
-// Load settings on page load
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', loadSettings);
 } else {

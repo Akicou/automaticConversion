@@ -24,7 +24,7 @@
         <nav class="glass-nav">
             <div class="nav-content">
                 <a href="/" class="nav-logo">
-                    <span class="logo-icon">⚒️</span>
+                    <span class="logo-icon">G</span>
                     <span class="logo-text">GGUF Forge</span>
                 </a>
 
@@ -39,7 +39,7 @@
                     {% if user %}
                     <a href="/settings" class="nav-item {{ 'active' if request.url.path == '/settings' else '' }}">Settings</a>
                     {% endif %}
-                    <button id="theme-toggle" class="nav-btn theme-btn" onclick="toggleTheme()" aria-label="Toggle theme">☀️</button>
+                    <button id="theme-toggle" class="nav-btn theme-btn" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
                     {% if user %}
                     {% if role != 'admin' %}
                     <a href="/#my-requests-list"
@@ -69,10 +69,10 @@
         <!-- Footer -->
         <footer class="glass-footer">
             <div class="footer-content">
-                <p>GGUF Forge &copy; 2025</p>
+                <p>&copy; 2025 GGUF Forge</p>
                 <div class="footer-links">
-                    <a href="https://github.com/Akicuo/automaticConversion" target="_blank">GitHub</a>
-                    <a href="https://huggingface.co" target="_blank">HuggingFace</a>
+                    <a href="https://github.com/Akicuo/automaticConversion" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://huggingface.co" target="_blank" rel="noopener">HuggingFace</a>
                 </div>
             </div>
         </footer>
