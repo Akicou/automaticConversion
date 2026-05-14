@@ -17,17 +17,80 @@ logger = logging.getLogger("GGUF_Forge")
 
 # These will be set by main app
 LLAMA_CPP_DIR = None
+LLAMA_CPP_REPO = None
 BASE_DIR = None
+
+# Defaults captured from env at startup so refresh can fall back to them
+_ENV_LLAMA_CPP_DIR: Optional[Path] = None
+_ENV_LLAMA_CPP_REPO: Optional[str] = None
+
+DEFAULT_LLAMA_CPP_REPO = "https://github.com/ggerganov/llama.cpp"
 
 # Thread pool for blocking operations
 _executor = ThreadPoolExecutor(max_workers=4)
 
 
-def set_paths(base_dir: Path, llama_cpp_dir: Path):
-    """Set the paths for managers."""
-    global BASE_DIR, LLAMA_CPP_DIR
+def set_paths(base_dir: Path, llama_cpp_dir: Path, llama_cpp_repo: Optional[str] = None):
+    """Set the paths/repo for managers. Values here are treated as the env/default fallback."""
+    global BASE_DIR, LLAMA_CPP_DIR, LLAMA_CPP_REPO, _ENV_LLAMA_CPP_DIR, _ENV_LLAMA_CPP_REPO
     BASE_DIR = base_dir
     LLAMA_CPP_DIR = llama_cpp_dir
+    LLAMA_CPP_REPO = llama_cpp_repo or DEFAULT_LLAMA_CPP_REPO
+    _ENV_LLAMA_CPP_DIR = llama_cpp_dir
+    _ENV_LLAMA_CPP_REPO = LLAMA_CPP_REPO
+
+
+async def refresh_llama_config():
+    """Reload LLAMA_CPP_DIR and LLAMA_CPP_REPO from DB (with env/default fallback).
+
+    Priority: app_config DB row > env-supplied value (captured in set_paths) > default.
+    Safe to call before init_db — falls back to env values if the DB read fails.
+    """
+    global LLAMA_CPP_DIR, LLAMA_CPP_REPO
+    try:
+        from database import get_app_config
+        db_dir = await get_app_config("llama_cpp_dir")
+        db_repo = await get_app_config("llama_cpp_repo")
+    except Exception as e:
+        logger.debug(f"refresh_llama_config: DB read skipped ({e})")
+        db_dir = None
+        db_repo = None
+
+    LLAMA_CPP_DIR = Path(db_dir).expanduser() if db_dir else _ENV_LLAMA_CPP_DIR
+    LLAMA_CPP_REPO = db_repo or _ENV_LLAMA_CPP_REPO or DEFAULT_LLAMA_CPP_REPO
+
+
+async def get_current_origin(folder: Optional[Path] = None) -> Optional[str]:
+    """Return `git config --get remote.origin.url` for the given folder, or None."""
+    target = folder or LLAMA_CPP_DIR
+    if not target or not (Path(target) / ".git").exists():
+        return None
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "git", "config", "--get", "remote.origin.url",
+            cwd=str(target),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode == 0:
+            url = stdout.decode().strip()
+            return url or None
+    except Exception:
+        pass
+    return None
+
+
+def _normalize_repo_url(url: str) -> str:
+    """Normalize a git URL for comparison (strip .git, trailing slash, lowercase host)."""
+    if not url:
+        return ""
+    u = url.strip()
+    if u.endswith(".git"):
+        u = u[:-4]
+    if u.endswith("/"):
+        u = u[:-1]
+    return u.lower()
 
 
 class LlamaCppManager:
@@ -57,11 +120,22 @@ class LlamaCppManager:
     @staticmethod
     async def clone_repo(force: bool = False):
         """Clone or update llama.cpp repository.
-        
+
         Args:
             force: If True, forcefully fetch and reset to latest remote commit,
                    discarding any local changes. If False, perform normal git pull.
         """
+        # If the folder already has a .git, make sure its origin matches the
+        # configured LLAMA_CPP_REPO. Refuse to touch unrelated checkouts.
+        if (LLAMA_CPP_DIR / ".git").exists():
+            current_origin = await get_current_origin(LLAMA_CPP_DIR)
+            if current_origin and _normalize_repo_url(current_origin) != _normalize_repo_url(LLAMA_CPP_REPO):
+                raise Exception(
+                    f"Folder '{LLAMA_CPP_DIR}' is already a clone of '{current_origin}', "
+                    f"but configured repo is '{LLAMA_CPP_REPO}'. Resolve manually "
+                    f"(delete the folder, change the configured repo, or point LLAMA_CPP_DIR elsewhere)."
+                )
+
         if LlamaCppManager.is_installed():
             if force:
                 logger.info("llama.cpp already exists. Forcefully updating to latest commit...")
@@ -133,15 +207,17 @@ class LlamaCppManager:
                 )
                 await proc.wait()
         else:
-            logger.info("Cloning llama.cpp...")
+            logger.info(f"Cloning llama.cpp from {LLAMA_CPP_REPO} into {LLAMA_CPP_DIR}...")
+            LLAMA_CPP_DIR.parent.mkdir(parents=True, exist_ok=True)
             proc = await asyncio.create_subprocess_exec(
-                "git", "clone", "https://github.com/ggerganov/llama.cpp", str(LLAMA_CPP_DIR),
+                "git", "clone", LLAMA_CPP_REPO, str(LLAMA_CPP_DIR),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            returncode = await proc.wait()
-            if returncode != 0:
-                raise Exception("Failed to clone llama.cpp")
+            stdout, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                error_msg = stderr.decode() if stderr else "Unknown error"
+                raise Exception(f"Failed to clone llama.cpp from {LLAMA_CPP_REPO}: {error_msg}")
 
     @staticmethod
     def _decode_output(data: bytes) -> str:

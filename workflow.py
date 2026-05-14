@@ -17,6 +17,7 @@ from huggingface_hub import HfApi, snapshot_download, create_repo, hf_hub_downlo
 from huggingface_hub.utils import tqdm as hf_tqdm
 
 from database import get_db_connection
+import managers
 from managers import LlamaCppManager, get_app_version
 from websocket_manager import broadcast_model_update, broadcast_transfer_progress
 
@@ -351,6 +352,7 @@ class ModelWorkflow:
         self.model_dir = None
         self.fp16_path = None
         self.quant_paths = []
+        self.current_progress = 0
         # Time tracking
         self.start_time = None
         self.step_times = {}  # step_name -> (start, end)
@@ -412,6 +414,11 @@ class ModelWorkflow:
         await self._update_db(log="\n".join(self.log_buffer)[-8000:])
 
     async def progress(self, percent: int):
+        # Keep UI progress monotonic during resume/parallel phases.
+        percent = max(0, min(100, int(percent)))
+        if percent < self.current_progress:
+            percent = self.current_progress
+        self.current_progress = percent
         await self._update_db(progress=percent)
 
     async def status(self, status_msg: str):
@@ -529,7 +536,7 @@ class ModelWorkflow:
             await self.log("  ⚠ Cannot generate mmproj: source model directory not available")
             return None
 
-        convert_script = LLAMA_CPP_DIR / "convert_hf_to_gguf.py"
+        convert_script = managers.LLAMA_CPP_DIR / "convert_hf_to_gguf.py"
         if not convert_script.exists():
             await self.log(f"  ⚠ Cannot generate mmproj: convert_hf_to_gguf.py missing at {convert_script}")
             return None
@@ -975,7 +982,10 @@ Great news! Your requested GGUF conversion is now complete!
             
             self.start_time = time.time()
             await self.status("initializing")
-            await self.progress(0)
+            initial_progress = 0
+            if self.resume_mode and self.completed_quants and self.quants_to_run:
+                initial_progress = min(89, 50 + int(len(self.completed_quants) / len(self.quants_to_run) * 40))
+            await self.progress(initial_progress)
             await self.log("━━━ GGUF Forge Pipeline Started ━━━")
             await self.log(f"Job ID: {self.model_id}")
             await self.log(f"Model: {self.hf_repo_id}")
@@ -986,6 +996,10 @@ Great news! Your requested GGUF conversion is now complete!
             self.check_terminated()
             self.start_step("setup")
             await self.log("▶ STEP 1: Setting up llama.cpp...")
+            # Re-read config so admin UI changes apply without restart
+            await managers.refresh_llama_config()
+            await self.log(f"  Repo: {managers.LLAMA_CPP_REPO}")
+            await self.log(f"  Dir:  {managers.LLAMA_CPP_DIR}")
             await self.log("  Checking llama.cpp installation...")
             if self.force_llama_update:
                 await self.log("  Force update enabled - will fetch latest llama.cpp commit...")
@@ -1139,7 +1153,7 @@ Great news! Your requested GGUF conversion is now complete!
                 self.start_step("convert")
                 await self.status("converting")
                 await self.log("▶ STEP 3: Converting to GGUF format (FP16)...")
-                convert_script = LLAMA_CPP_DIR / "convert_hf_to_gguf.py"
+                convert_script = managers.LLAMA_CPP_DIR / "convert_hf_to_gguf.py"
 
                 cmd = [sys.executable, str(convert_script), str(self.model_dir), "--outfile", str(self.fp16_path), "--outtype", "f16"]
                 process = await asyncio.create_subprocess_exec(
@@ -1257,6 +1271,7 @@ Great news! Your requested GGUF conversion is now complete!
                 await self.log("")
             
             if self.hf_token and self.new_repo_id:
+                await self.status("uploading")
                 await self.upload_status_readme(quant_base_name, uploaded_files)
 
             # Upload (or relocate) the mmproj projector for vision models, once, before quants run.
@@ -1275,6 +1290,7 @@ Great news! Your requested GGUF conversion is now complete!
                     except Exception as e:
                         await self.log(f"  ⚠ Failed to move mmproj to local output: {e}")
                 elif self.hf_token and self.new_repo_id:
+                    await self.status("uploading")
                     file_size = self.mmproj_path.stat().st_size
                     size_str = f"{file_size / (1024**3):.2f}GB"
                     await self.update_transfer_progress(mmproj_name, 0, size_str, "Uploading...", "upload")
@@ -1319,6 +1335,7 @@ Great news! Your requested GGUF conversion is now complete!
             async def process_single_quant(q_type: str, overall_idx: int):
                 async with semaphore:
                     self.check_terminated()
+                    await self.status("quantizing")
                     await self.log(f"  [{overall_idx}/{total_quants}] Starting {q_type}...")
                     
                     q_path = CACHE_DIR / f"{quant_base_name}.{q_type}.gguf"
@@ -1382,6 +1399,7 @@ Great news! Your requested GGUF conversion is now complete!
                                 return
                         elif self.hf_token and self.new_repo_id:
                             self.check_terminated()
+                            await self.status("uploading")
 
                             filename = f"{quant_base_name}.{q_type}.gguf"
                             file_size = q_path.stat().st_size if q_path.exists() else 0
@@ -1458,6 +1476,7 @@ Great news! Your requested GGUF conversion is now complete!
 
             # 5. Readme
             if self.hf_token and uploaded_files and self.new_repo_id:
+                await self.status("uploading")
                 await self.log("▶ STEP 5: Generating README...")
                 
                 # Get app version (async)

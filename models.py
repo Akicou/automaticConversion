@@ -56,3 +56,9 @@ class LocalProcessRequest(BaseModel):
     keep_local_only: Optional[bool] = False  # If True, skip HF upload and write GGUFs into <path>/gguf/
     ignore_space_check: Optional[bool] = False
     enable_shard_merging: Optional[bool] = True
+
+
+class LlamaCppSourceConfig(BaseModel):
+    """Admin: configure which llama.cpp fork/folder GGUF Forge uses."""
+    repo: str  # Git URL, e.g. https://github.com/<owner>/llama.cpp
+    dir: str   # Absolute or relative folder path for the local checkout

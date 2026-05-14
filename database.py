@@ -697,6 +697,15 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
         INSERT OR IGNORE INTO quant_priority (id, priority_order) VALUES (1, '')
     ''')
 
+    # App-wide configuration key/value store (e.g. llama_cpp_repo, llama_cpp_dir)
+    await conn.execute('''
+        CREATE TABLE IF NOT EXISTS app_config (
+            config_key TEXT PRIMARY KEY,
+            config_value TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     # Performance indexes for frequently queried columns
     await conn.execute('CREATE INDEX IF NOT EXISTS idx_models_status ON models(status)')
     await conn.execute('CREATE INDEX IF NOT EXISTS idx_models_hf_repo_id ON models(hf_repo_id)')
@@ -942,6 +951,17 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
     except:
         pass
 
+    # App-wide configuration key/value store
+    await conn.execute('''
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='app_config' AND xtype='U')
+        CREATE TABLE app_config (
+            config_key NVARCHAR(255) PRIMARY KEY,
+            config_value NVARCHAR(MAX),
+            updated_at DATETIME DEFAULT GETDATE()
+        )
+    ''')
+    await conn.commit()
+
     # Performance indexes for frequently queried columns
     index_queries = [
         "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_models_status') CREATE INDEX idx_models_status ON models(status)",
@@ -973,3 +993,46 @@ async def test_connection() -> tuple[bool, str]:
         return True, f"Successfully connected to {DB_TYPE} database"
     except Exception as e:
         return False, f"Failed to connect to {DB_TYPE} database: {str(e)}"
+
+
+async def get_app_config(key: str) -> Optional[str]:
+    """Read a value from the app_config key/value store. Returns None if unset."""
+    conn = await get_db_connection()
+    try:
+        await conn.execute(
+            "SELECT config_value FROM app_config WHERE config_key = ?",
+            (key,)
+        )
+        row = await conn.fetchone()
+        if not row:
+            return None
+        value = row.get('config_value')
+        return value if value else None
+    finally:
+        await conn.close()
+
+
+async def set_app_config(key: str, value: Optional[str]):
+    """Upsert a value into the app_config store. Pass None/'' to clear."""
+    from datetime import datetime as _dt
+    conn = await get_db_connection()
+    try:
+        await conn.execute(
+            "SELECT config_value FROM app_config WHERE config_key = ?",
+            (key,)
+        )
+        existing = await conn.fetchone()
+        now = _dt.now()
+        if existing:
+            await conn.execute(
+                "UPDATE app_config SET config_value = ?, updated_at = ? WHERE config_key = ?",
+                (value, now, key)
+            )
+        else:
+            await conn.execute(
+                "INSERT INTO app_config (config_key, config_value, updated_at) VALUES (?, ?, ?)",
+                (key, value, now)
+            )
+        await conn.commit()
+    finally:
+        await conn.close()

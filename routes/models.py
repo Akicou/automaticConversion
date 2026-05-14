@@ -114,7 +114,7 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
     await conn.execute("SELECT * FROM models WHERE hf_repo_id = ?", (req.model_id,))
     existing = await conn.fetchone()
     
-    if existing and existing['status'] in ['pending', 'downloading', 'converting', 'quantizing', 'initializing']:
+    if existing and existing['status'] in ['pending', 'downloading', 'converting', 'quantizing', 'uploading', 'initializing']:
          await conn.close()
          raise HTTPException(status_code=400, detail="Model already processing")
     
@@ -231,7 +231,7 @@ async def process_local_model(req: LocalProcessRequest, background_tasks: Backgr
     await conn.execute("SELECT * FROM models WHERE hf_repo_id = ?", (repo_id,))
     existing = await conn.fetchone()
 
-    if existing and existing['status'] in ['pending', 'downloading', 'converting', 'quantizing', 'initializing']:
+    if existing and existing['status'] in ['pending', 'downloading', 'converting', 'quantizing', 'uploading', 'initializing']:
         await conn.close()
         raise HTTPException(status_code=400, detail="Model already processing")
 
@@ -525,16 +525,19 @@ async def force_update_llama_cpp(force: bool = False, rebuild: bool = False, use
         Status of the update operation including current commit hash.
     """
     try:
+        # Re-read config so any admin UI change takes effect before we touch git
+        import managers
+        await managers.refresh_llama_config()
+
         # Update the repository
         await LlamaCppManager.clone_repo(force=force)
-        
+
         # Get current commit info
         import asyncio
-        from managers import LLAMA_CPP_DIR
-        
+
         proc = await asyncio.create_subprocess_exec(
             "git", "log", "-1", "--format=%H|%s|%an|%ar",
-            cwd=LLAMA_CPP_DIR,
+            cwd=managers.LLAMA_CPP_DIR,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )

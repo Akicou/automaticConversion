@@ -359,6 +359,63 @@ input[type="range"].setting-range::-moz-range-thumb {
             <button type="submit" class="save-button">Save changes</button>
         </div>
     </form>
+
+    {% if role == 'admin' %}
+    <!-- llama.cpp source (admin only) -->
+    <div class="settings-section" id="llama-source-section" style="margin-top: 1.5rem;">
+        <h2>llama.cpp source</h2>
+        <p class="section-desc">Point GGUF Forge at a custom llama.cpp fork (e.g. one with extra model support) and pick where it lives on disk. Changes apply to the next conversion run — no restart needed.</p>
+
+        <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 0.5rem;">
+            <div class="setting-info">
+                <h3>Repository URL</h3>
+                <p>Git URL to clone from. Leave the default for upstream ggerganov/llama.cpp.</p>
+            </div>
+            <input type="text" id="llama_repo" class="llama-text-input" placeholder="https://github.com/owner/llama.cpp" autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 0.5rem;">
+            <div class="setting-info">
+                <h3>Folder path</h3>
+                <p>Absolute (e.g. <code>D:\llama-fork</code>) or relative to the app directory (e.g. <code>./llama.cpp</code>).</p>
+            </div>
+            <input type="text" id="llama_dir" class="llama-text-input" placeholder="./llama.cpp" autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 0.4rem;">
+            <div class="setting-info">
+                <h3>Current status</h3>
+                <p id="llama-status-line">Loading…</p>
+            </div>
+            <div id="llama-validate-result" style="font-size: 0.8rem; color: var(--text-tertiary); margin-top: 0.2rem;"></div>
+        </div>
+
+        <div class="settings-actions" style="margin-top: 0.75rem;">
+            <button type="button" class="save-button" id="llama-validate-btn" style="background: transparent; color: var(--text-primary); border-color: var(--border-color);" onclick="validateLlamaSource()">Validate</button>
+            <button type="button" class="save-button" id="llama-save-btn" onclick="saveLlamaSource()">Save &amp; reload</button>
+        </div>
+    </div>
+
+    <style>
+    .llama-text-input {
+        padding: 0.5rem 0.75rem;
+        background: var(--input-bg);
+        border: 1px solid var(--input-border);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-size: 0.85rem;
+        font-family: var(--font-mono);
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .llama-text-input:focus {
+        outline: none;
+        border-color: var(--text-primary);
+    }
+    #llama-validate-result.is-ok { color: #4ade80; }
+    #llama-validate-result.is-err { color: #f87171; }
+    </style>
+    {% endif %}
 </div>
 
 <script>
@@ -378,9 +435,99 @@ async function loadSettings() {
             currentSettings = await settingsRes.json();
             applySettingsToForm();
         }
+
+        if ('{{ role }}' === 'admin') {
+            await loadLlamaSource();
+        }
     } catch (e) {
         console.error('Failed to load settings:', e);
         showToast('error', 'Failed to load settings');
+    }
+}
+
+async function loadLlamaSource() {
+    try {
+        const res = await fetch('/api/settings/admin/llama-cpp');
+        if (!res.ok) return;
+        const cfg = await res.json();
+        document.getElementById('llama_repo').value = cfg.repo || '';
+        document.getElementById('llama_dir').value = cfg.dir || '';
+
+        const parts = [];
+        parts.push(`Configured: <code>${escapeHtml(cfg.repo || '')}</code> → <code>${escapeHtml(cfg.dir || '')}</code>`);
+        if (cfg.current_origin) {
+            parts.push(`Folder origin: <code>${escapeHtml(cfg.current_origin)}</code>`);
+        } else if (cfg.installed) {
+            parts.push('Folder is installed (no git origin detected).');
+        } else {
+            parts.push('Folder is empty — will be cloned on next run.');
+        }
+        document.getElementById('llama-status-line').innerHTML = parts.join('<br>');
+    } catch (e) {
+        console.error('Failed to load llama.cpp source config:', e);
+    }
+}
+
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+async function validateLlamaSource() {
+    const repo = document.getElementById('llama_repo').value.trim();
+    const dir = document.getElementById('llama_dir').value.trim();
+    const out = document.getElementById('llama-validate-result');
+    out.className = '';
+    out.textContent = 'Validating…';
+
+    try {
+        const res = await fetch('/api/settings/admin/llama-cpp/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ repo, dir })
+        });
+        const data = await res.json();
+        if (data.valid) {
+            out.className = 'is-ok';
+            out.textContent = data.reason || 'OK';
+        } else {
+            out.className = 'is-err';
+            out.textContent = data.reason || 'Invalid configuration';
+        }
+    } catch (e) {
+        out.className = 'is-err';
+        out.textContent = 'Validation failed: ' + e.message;
+    }
+}
+
+async function saveLlamaSource() {
+    const repo = document.getElementById('llama_repo').value.trim();
+    const dir = document.getElementById('llama_dir').value.trim();
+    const btn = document.getElementById('llama-save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    try {
+        const res = await fetch('/api/settings/admin/llama-cpp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ repo, dir })
+        });
+        if (res.ok) {
+            showToast('success', 'llama.cpp source updated');
+            await loadLlamaSource();
+        } else {
+            const err = await res.json().catch(() => ({}));
+            showToast('error', err.detail || 'Failed to update llama.cpp source');
+        }
+    } catch (e) {
+        showToast('error', 'Failed to update: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save & reload';
     }
 }
 

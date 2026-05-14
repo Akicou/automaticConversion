@@ -94,6 +94,10 @@ else:
     # Default: llama.cpp subdirectory
     LLAMA_CPP_DIR = BASE_DIR / "llama.cpp"
 
+# Llama.cpp source repository - configurable via LLAMA_CPP_REPO environment variable
+# Lets users point GGUF Forge at a fork (e.g. one with extra model support).
+LLAMA_CPP_REPO = os.getenv("LLAMA_CPP_REPO", "").strip() or "https://github.com/ggerganov/llama.cpp"
+
 DB_PATH = BASE_DIR / "gguf_app.db"
 
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -118,13 +122,14 @@ OAUTH_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI", "http://localhost:8000/auth
 # --- Initialize Modules ---
 from database import init_db, get_db_connection, set_db_path
 from security import RateLimiter, BotDetector, SpamProtection
+import managers
 from managers import set_paths as set_manager_paths
 from workflow import set_workflow_config, running_workflows, ModelQueue, set_model_queue, get_model_queue
 from websocket_manager import manager as ws_manager
 
 # Set paths for modules
 set_db_path(DB_PATH)
-set_manager_paths(BASE_DIR, LLAMA_CPP_DIR)
+set_manager_paths(BASE_DIR, LLAMA_CPP_DIR, LLAMA_CPP_REPO)
 set_workflow_config(CACHE_DIR, LLAMA_CPP_DIR, QUANTS, PARALLEL_QUANT_JOBS)
 
 # Initialize security instances
@@ -181,7 +186,12 @@ async def require_admin(request: Request):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    
+
+    # Reload llama.cpp config now that the DB is available, so admin-UI overrides
+    # set in a previous session take effect at startup.
+    await managers.refresh_llama_config()
+    logger.info(f"llama.cpp source: repo={managers.LLAMA_CPP_REPO} dir={managers.LLAMA_CPP_DIR}")
+
     # Initialize and start the model queue worker
     queue = ModelQueue()
     set_model_queue(queue)

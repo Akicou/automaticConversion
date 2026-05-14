@@ -7,3 +7,4 @@ venv
 llama.cpp
 creds.txt
 cmake
+.claude/
