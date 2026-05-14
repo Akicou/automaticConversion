@@ -564,7 +564,8 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
             enable_shard_merging INTEGER DEFAULT 1,
             requested_by TEXT,
             local_source_path TEXT,
-            keep_local_only INTEGER DEFAULT 0
+            keep_local_only INTEGER DEFAULT 0,
+            transfer_state TEXT DEFAULT ''
         )
     ''')
     
@@ -607,6 +608,12 @@ async def _init_sqlite_tables(conn: AsyncDatabaseConnection):
     # Migration: Add keep_local_only column if it doesn't exist
     try:
         await conn.execute("ALTER TABLE models ADD COLUMN keep_local_only INTEGER DEFAULT 0")
+    except:
+        pass  # Column already exists
+
+    # Migration: Add transfer_state column if it doesn't exist
+    try:
+        await conn.execute("ALTER TABLE models ADD COLUMN transfer_state TEXT DEFAULT ''")
     except:
         pass  # Column already exists
 
@@ -754,7 +761,8 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
             enable_shard_merging BIT DEFAULT 1,
             requested_by NVARCHAR(255),
             local_source_path NVARCHAR(MAX),
-            keep_local_only BIT DEFAULT 0
+            keep_local_only BIT DEFAULT 0,
+            transfer_state NVARCHAR(MAX) DEFAULT ''
         )
     ''')
     await conn.commit()
@@ -824,6 +832,16 @@ async def _init_mssql_tables(conn: AsyncDatabaseConnection):
         await conn.execute('''
             IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'keep_local_only')
             ALTER TABLE models ADD keep_local_only BIT DEFAULT 0
+        ''')
+        await conn.commit()
+    except:
+        pass
+
+    # Migration: Add transfer_state column if it doesn't exist
+    try:
+        await conn.execute('''
+            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'models' AND COLUMN_NAME = 'transfer_state')
+            ALTER TABLE models ADD transfer_state NVARCHAR(MAX) DEFAULT ''
         ''')
         await conn.commit()
     except:

@@ -2338,6 +2338,10 @@ async function requestModel() {
                     continueIgnoreSpace.style.display = 'none';
                 }
             }
+
+            // Rehydrate per-file transfer UI from the DB snapshot so reloading
+            // mid-download doesn't blank out the file list.
+            replayTransferState(model);
         });
 
         // 3. Remove stale cards
@@ -3084,6 +3088,20 @@ async function requestModel() {
         }
     }
 
+    // Replay a persisted transfer_state snapshot from the DB after a page
+    // reload, so the per-file list isn't blank while the WebSocket reconnects.
+    function replayTransferState(model) {
+        if (!model || !model.transfer_state) return;
+        try {
+            const ts = typeof model.transfer_state === 'string'
+                ? JSON.parse(model.transfer_state)
+                : model.transfer_state;
+            if (ts && Array.isArray(ts.files) && ts.files.length) {
+                updateTransferProgress(model.id, ts.type || 'download', ts.files);
+            }
+        } catch (_e) { /* ignore malformed snapshot */ }
+    }
+
     function updateTransferProgress(modelId, transferType, files) {
         const container = document.getElementById('models-list');
         const card = container.querySelector(`.model-card[data-model-id="${modelId}"]`);
@@ -3239,6 +3257,9 @@ async function requestModel() {
                     continueIgnoreSpace.style.display = 'none';
                 }
             }
+
+            // Keep transfer UI in sync with the latest DB snapshot.
+            replayTransferState(model);
         } else {
             // New model - fetch all to get proper ordering
             fetchStatus();

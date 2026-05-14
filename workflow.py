@@ -57,6 +57,20 @@ def get_cache_dir():
 _MODEL_WEIGHT_EXTS = (".safetensors", ".bin", ".pt", ".pth")
 
 
+def _humanize_bytes(n: float) -> str:
+    """Format a byte count as e.g. '1.23 GB', '450 MB', '2.1 KB'. Negative/None → '—'."""
+    if n is None or n < 0:
+        return "—"
+    n = float(n)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024.0 or unit == "TB":
+            if unit == "B":
+                return f"{int(n)} B"
+            return f"{n:.2f} {unit}" if n < 10 else f"{n:.1f} {unit}"
+        n /= 1024.0
+    return f"{n:.1f} TB"
+
+
 def _has_safetensors(directory: Path) -> bool:
     try:
         return any(directory.glob("*.safetensors"))
@@ -359,6 +373,8 @@ class ModelWorkflow:
         self.quant_times = []  # list of (q_type, duration_seconds)
         # Transfer progress tracking
         self.transfer_files = {}  # filename -> {"progress": 0, "size": "", "speed": ""}
+        self._last_transfer_persist = 0.0  # monotonic seconds; throttles DB writes
+        self._last_transfer_type = "download"  # remembered for restore-on-reload
         # Termination support
         self.terminated = False
         self.running_processes: List[asyncio.subprocess.Process] = []
@@ -874,22 +890,44 @@ Great news! Your requested GGUF conversion is now complete!
         return summary
     
     async def update_transfer_progress(self, filename: str, progress: int, size: str = "", speed: str = "", transfer_type: str = "download"):
-        """Update and broadcast transfer progress for a file."""
+        """Update and broadcast transfer progress for a file.
+
+        Always broadcasts over WebSocket (cheap). Persists the snapshot to the
+        DB on ~1Hz throttle or whenever a file hits a terminal state, so a
+        page reload mid-transfer can rehydrate the per-file UI.
+        """
+        import time as _time
         self.transfer_files[filename] = {
             "name": filename,
             "progress": progress,
             "size": size,
             "speed": speed
         }
-        
-        # Broadcast the current transfer state
+        self._last_transfer_type = transfer_type
+
         files_list = list(self.transfer_files.values())
         await broadcast_transfer_progress(self.model_id, transfer_type, files_list)
-    
-    def clear_transfer_progress(self):
-        """Clear transfer progress tracking."""
+
+        # Persist a snapshot for reload-safety. Throttled to ~1Hz; terminal
+        # states (100% / failed) always flush so the UI re-renders correctly.
+        terminal = progress in (100, -1)
+        now = _time.monotonic()
+        if terminal or (now - self._last_transfer_persist) >= 1.0:
+            self._last_transfer_persist = now
+            snapshot = json.dumps({"type": transfer_type, "files": files_list})
+            try:
+                await self._update_db(transfer_state=snapshot)
+            except Exception:
+                pass  # never let persistence kill the transfer
+
+    async def clear_transfer_progress(self):
+        """Clear transfer progress tracking (both memory and DB snapshot)."""
         self.transfer_files = {}
-        return
+        self._last_transfer_persist = 0.0
+        try:
+            await self._update_db(transfer_state="")
+        except Exception:
+            pass
 
     async def check_disk_space(self, required_gb: float):
         loop = asyncio.get_event_loop()
@@ -911,30 +949,104 @@ Great news! Your requested GGUF conversion is now complete!
             raise Exception(f"Insufficient disk space. Required: {required_gb:.1f}GB, Available: {free_gb:.1f}GB")
         await self.log(f"  ✓ Sufficient disk space")
 
-    async def get_model_size_gb(self) -> float:
-        """Get model size from HuggingFace API in GB."""
+    async def get_repo_file_sizes(self) -> dict:
+        """Fetch per-file byte sizes for the HF repo. Returns {rfilename: size_bytes}.
+
+        Cached on the instance so we only hit the HF metadata API once per run.
+        """
+        if getattr(self, "_repo_file_sizes", None) is not None:
+            return self._repo_file_sizes
         try:
             hf_token = os.getenv("HF_TOKEN")
             api = HfApi(token=hf_token)
-            
-            # Run blocking API call in executor
             loop = asyncio.get_event_loop()
-            model_info = await loop.run_in_executor(
+            info = await loop.run_in_executor(
                 None,
                 lambda: api.model_info(self.hf_repo_id, files_metadata=True)
             )
-            
-            total_bytes = 0
-            if model_info.siblings:
-                for sibling in model_info.siblings:
-                    if hasattr(sibling, 'size') and sibling.size:
-                        total_bytes += sibling.size
-            
-            size_gb = total_bytes / (2**30)
-            return size_gb
+            sizes = {}
+            for sib in (info.siblings or []):
+                name = getattr(sib, 'rfilename', None) or getattr(sib, 'filename', None)
+                size = getattr(sib, 'size', None)
+                if name and size:
+                    sizes[name] = int(size)
+            self._repo_file_sizes = sizes
+            return sizes
         except Exception as e:
-            await self.log(f"  ⚠ Could not fetch model size: {e}")
-            return 10.0  # Default fallback
+            await self.log(f"  ⚠ Could not fetch repo file sizes: {e}")
+            self._repo_file_sizes = {}
+            return {}
+
+    async def get_model_size_gb(self) -> float:
+        """Get total model size in GB. Reuses get_repo_file_sizes()."""
+        sizes = await self.get_repo_file_sizes()
+        if not sizes:
+            return 10.0  # Fallback when API failed
+        total_bytes = sum(sizes.values())
+        return total_bytes / (2**30)
+
+    async def _poll_file_progress(self, short_name: str, dest_path: Path, total_size: int, transfer_type: str = "download"):
+        """Watch dest_path (and any *.incomplete sibling) and broadcast live %/speed.
+
+        Runs until cancelled. Caps at 99% so the final 100% tick is the one
+        emitted by the caller after the download executor returns.
+        """
+        import time as _time
+        last_bytes = 0
+        last_t = _time.monotonic()
+        ema_rate = 0.0
+
+        # hf_hub_download may write to either `<dest>` directly or a sibling
+        # *.incomplete temp file depending on hub-version & symlink mode. We
+        # try the final path first, then glob siblings.
+        def _current_bytes() -> int:
+            try:
+                if dest_path.exists():
+                    return dest_path.stat().st_size
+            except OSError:
+                pass
+            try:
+                parent = dest_path.parent
+                stem = dest_path.name
+                best = 0
+                for candidate in parent.glob(stem + "*.incomplete"):
+                    try:
+                        sz = candidate.stat().st_size
+                        if sz > best:
+                            best = sz
+                    except OSError:
+                        continue
+                return best
+            except Exception:
+                return 0
+
+        try:
+            while True:
+                await asyncio.sleep(0.5)
+                bytes_now = _current_bytes()
+                now = _time.monotonic()
+                dt = max(now - last_t, 1e-3)
+                inst_rate = max(0.0, (bytes_now - last_bytes) / dt)
+                # Exponential moving average for a less jittery speed display.
+                ema_rate = inst_rate if ema_rate == 0 else (0.7 * ema_rate + 0.3 * inst_rate)
+                last_bytes = bytes_now
+                last_t = now
+
+                if total_size > 0:
+                    pct = min(99, int(100 * bytes_now / total_size))
+                    size_str = f"{_humanize_bytes(bytes_now)} / {_humanize_bytes(total_size)}"
+                else:
+                    pct = 0
+                    size_str = _humanize_bytes(bytes_now)
+
+                speed_str = f"{_humanize_bytes(ema_rate)}/s" if ema_rate > 0 else ""
+                await self.update_transfer_progress(short_name, pct, size_str, speed_str, transfer_type)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            # Don't let a poller bug kill the download.
+            import logging
+            logging.getLogger("GGUF_Forge").debug(f"_poll_file_progress({short_name}): {e}")
 
     async def cleanup(self):
         """Remove all downloaded and generated files."""
@@ -1051,7 +1163,7 @@ Great news! Your requested GGUF conversion is now complete!
                 await self.check_disk_space(required_gb)
 
                 # Clear any previous transfer progress
-                self.clear_transfer_progress()
+                await self.clear_transfer_progress()
 
                 # Get list of files to download
                 api = HfApi()
@@ -1067,6 +1179,9 @@ Great news! Your requested GGUF conversion is now complete!
 
                     await self.log(f"  Found {len(download_files)} files to download")
 
+                    # Fetch per-file sizes once for live progress + size display
+                    file_sizes = await self.get_repo_file_sizes()
+
                     # Download files with progress tracking
                     local_dir = CACHE_DIR / self.hf_repo_id
                     local_dir.mkdir(parents=True, exist_ok=True)
@@ -1075,11 +1190,18 @@ Great news! Your requested GGUF conversion is now complete!
                     for idx, filename in enumerate(download_files):
                         self.check_terminated()
                         short_name = filename.split('/')[-1] if '/' in filename else filename
+                        total_size = file_sizes.get(filename, 0)
+                        size_label = _humanize_bytes(total_size) if total_size else ""
 
                         # Initialize progress for this file
-                        await self.update_transfer_progress(short_name, 0, "", "Starting...", "download")
+                        await self.update_transfer_progress(short_name, 0, size_label, "Starting...", "download")
 
-                        # Download file in thread pool
+                        # Spawn the disk poller so % / bytes / speed tick live
+                        dest_path = local_dir / filename
+                        poller = asyncio.create_task(
+                            self._poll_file_progress(short_name, dest_path, total_size, "download")
+                        )
+
                         try:
                             await loop.run_in_executor(
                                 None,
@@ -1090,11 +1212,17 @@ Great news! Your requested GGUF conversion is now complete!
                                     local_dir_use_symlinks=False
                                 )
                             )
-                            # Mark as complete
-                            await self.update_transfer_progress(short_name, 100, "", "Complete", "download")
+                            # Mark as complete (overrides whatever the poller last reported)
+                            await self.update_transfer_progress(short_name, 100, size_label, "Complete", "download")
                         except Exception as e:
                             await self.log(f"  ⚠ Failed to download {short_name}: {e}")
-                            await self.update_transfer_progress(short_name, -1, "", "Failed", "download")
+                            await self.update_transfer_progress(short_name, -1, size_label, "Failed", "download")
+                        finally:
+                            poller.cancel()
+                            try:
+                                await poller
+                            except (asyncio.CancelledError, Exception):
+                                pass
 
                         # Update overall progress (10-30% for download step)
                         step_progress = 10 + int((idx + 1) / total_files * 20)
@@ -1115,7 +1243,7 @@ Great news! Your requested GGUF conversion is now complete!
                     )
 
                 # Clear download progress display
-                self.clear_transfer_progress()
+                await self.clear_transfer_progress()
                 await broadcast_transfer_progress(self.model_id, "download", [])
 
                 await self.log(f"  ✓ Downloaded to {self.model_dir}")
@@ -1627,7 +1755,14 @@ Full Ollama support is provided by merging any sharded GGUF output into a single
         finally:
             # Remove from global registry
             running_workflows.pop(self.model_id, None)
-            
+
+            # Clear any persisted transfer snapshot so a finished job's card
+            # doesn't render stale file-by-file rows on reload.
+            try:
+                await self.clear_transfer_progress()
+            except Exception:
+                pass
+
             # Always cleanup files
             await self.log("")
             await self.log("▶ Cleanup...")
