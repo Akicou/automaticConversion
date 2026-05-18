@@ -234,8 +234,8 @@ def _resolve_dir(raw: str) -> Path:
     return (base / p).resolve()
 
 
-async def _validate_source(repo: str, raw_dir: str) -> dict:
-    """Validate a candidate (repo, dir) combo. Does not mutate anything."""
+async def _validate_source(repo: str, raw_dir: str, outtypes: Optional[List[str]] = None) -> dict:
+    """Validate a candidate (repo, dir [, outtypes]) combo. Does not mutate anything."""
     import managers
 
     repo = (repo or "").strip()
@@ -245,6 +245,18 @@ async def _validate_source(repo: str, raw_dir: str) -> dict:
         return {"valid": False, "conflict": False, "reason": "Repo URL is required."}
     if not raw_dir:
         return {"valid": False, "conflict": False, "reason": "Folder path is required."}
+
+    raw_outtypes = list(outtypes or [])
+    normalized_outtypes = managers.normalize_outtypes(raw_outtypes)
+    # Reject entries whose shape is invalid (anything that survived stripping but didn't normalize).
+    bad = [v for v in raw_outtypes
+           if isinstance(v, str) and v.strip() and v.strip().lower() not in normalized_outtypes]
+    if bad:
+        return {
+            "valid": False,
+            "conflict": False,
+            "reason": f"Invalid outtype(s): {', '.join(bad)}. Use lowercase alphanumeric/underscore tokens (e.g. q8_0, iq2_xxs).",
+        }
 
     resolved = _resolve_dir(raw_dir)
 
@@ -265,6 +277,7 @@ async def _validate_source(repo: str, raw_dir: str) -> dict:
             "reason": "Existing clone matches the configured repo.",
             "current_origin": current,
             "resolved_dir": str(resolved),
+            "outtypes": normalized_outtypes,
         }
 
     # Doesn't exist or isn't a git repo — make sure we can create/write the parent.
@@ -283,6 +296,7 @@ async def _validate_source(repo: str, raw_dir: str) -> dict:
         "reason": "Folder is available — will clone on first use.",
         "current_origin": None,
         "resolved_dir": str(resolved),
+        "outtypes": normalized_outtypes,
     }
 
 
@@ -298,28 +312,38 @@ async def get_llama_cpp_source(request: Request):
         "current_origin": current_origin,
         "default_repo": managers.DEFAULT_LLAMA_CPP_REPO,
         "installed": (managers.LLAMA_CPP_DIR / "CMakeLists.txt").exists() if managers.LLAMA_CPP_DIR else False,
+        "outtypes": list(managers.LLAMA_CPP_OUTTYPES),
     }
+
+
+@router.get("/llama-cpp-outtypes")
+async def get_llama_cpp_outtypes_public():
+    """Public read of the configured fork outtypes — used to populate the conversion form."""
+    import managers
+    return {"outtypes": list(managers.LLAMA_CPP_OUTTYPES)}
 
 
 @router.post("/admin/llama-cpp/validate")
 async def validate_llama_cpp_source(request: Request, body: LlamaCppSourceConfig):
-    """Admin only: dry-run validation of a (repo, dir) combo without saving."""
+    """Admin only: dry-run validation of a (repo, dir [, outtypes]) combo without saving."""
     await get_admin(request)
-    return await _validate_source(body.repo, body.dir)
+    return await _validate_source(body.repo, body.dir, body.outtypes)
 
 
 @router.post("/admin/llama-cpp")
 async def set_llama_cpp_source(request: Request, body: LlamaCppSourceConfig):
-    """Admin only: persist new llama.cpp repo + folder and reload config."""
+    """Admin only: persist new llama.cpp repo + folder + outtypes and reload config."""
     await get_admin(request)
     import managers
 
-    result = await _validate_source(body.repo, body.dir)
+    result = await _validate_source(body.repo, body.dir, body.outtypes)
     if not result.get("valid"):
         raise HTTPException(status_code=400, detail=result.get("reason", "Invalid configuration"))
 
+    normalized_outtypes = result.get("outtypes") or []
     await set_app_config("llama_cpp_repo", body.repo.strip())
     await set_app_config("llama_cpp_dir", body.dir.strip())
+    await set_app_config("llama_cpp_outtypes", json.dumps(normalized_outtypes))
     await managers.refresh_llama_config()
 
     return {
@@ -327,4 +351,5 @@ async def set_llama_cpp_source(request: Request, body: LlamaCppSourceConfig):
         "repo": managers.LLAMA_CPP_REPO,
         "dir": str(managers.LLAMA_CPP_DIR),
         "resolved_dir": result.get("resolved_dir"),
+        "outtypes": list(managers.LLAMA_CPP_OUTTYPES),
     }

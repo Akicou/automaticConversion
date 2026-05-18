@@ -5,6 +5,7 @@ import os
 import uuid
 import json
 import asyncio
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 
@@ -104,6 +105,39 @@ def validate_quants(quants: list) -> list:
     return [q for q in quants if q in available]
 
 
+def resolve_convert_outtype(raw: object) -> Optional[str]:
+    """Normalize a user-supplied convert_outtype value.
+
+    Returns:
+        - None for "use the standard FP16 + llama-quantize flow".
+        - lowercase outtype string when set to a configured fork-specific value.
+
+    Raises HTTPException(400) if the outtype is non-empty but not in the active
+    fork's configured list (managers.LLAMA_CPP_OUTTYPES). FP16/BF16/F32 are
+    treated as the default — they collapse to None so the standard flow runs.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise HTTPException(status_code=400, detail="convert_outtype must be a string")
+    s = raw.strip().lower()
+    if not s:
+        return None
+
+    import managers
+    if s in managers.NON_COMPACT_OUTTYPES:
+        return None
+
+    allowed = list(managers.LLAMA_CPP_OUTTYPES)
+    if s not in allowed:
+        allowed_msg = ", ".join(allowed) if allowed else "(none configured)"
+        raise HTTPException(
+            status_code=400,
+            detail=f"convert_outtype '{s}' is not in the active fork's allowed list: {allowed_msg}",
+        )
+    return s
+
+
 @router.post("/models/process")
 async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, user = Depends(get_admin)):
     is_valid, msg = validate_hf_repo_sync(req.model_id)
@@ -118,24 +152,32 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
          await conn.close()
          raise HTTPException(status_code=400, detail="Model already processing")
     
-    # Validate and process quants
+    convert_outtype = resolve_convert_outtype(getattr(req, 'convert_outtype', None))
+
+    # Validate and process quants. Direct-outtype mode produces exactly one
+    # artifact named after the outtype — the per-quant selection doesn't apply.
     available_quants = get_quants_list()
-    if req.quants:
+    if convert_outtype:
+        quants_to_run = [convert_outtype.upper()]
+    elif req.quants:
         quants_to_run = validate_quants(req.quants)
         if not quants_to_run:
             await conn.close()
             raise HTTPException(status_code=400, detail="No valid quants specified")
     else:
         quants_to_run = available_quants
-    
+
     new_id = str(uuid.uuid4())
-    
+
     # Delete existing record first (if any) for MSSQL compatibility
     # This replaces "INSERT OR REPLACE" which is SQLite-specific
     if existing:
         await conn.execute("DELETE FROM models WHERE hf_repo_id = ?", (req.model_id,))
-    
-    quants_msg = ', '.join(quants_to_run) if len(quants_to_run) < len(available_quants) else 'all quants'
+
+    if convert_outtype:
+        quants_msg = f"direct {convert_outtype.upper()} (skips llama-quantize)"
+    else:
+        quants_msg = ', '.join(quants_to_run) if len(quants_to_run) < len(available_quants) else 'all quants'
 
     # Get admin options
     ignore_space_check = req.ignore_space_check if hasattr(req, 'ignore_space_check') else False
@@ -149,8 +191,8 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
         log_msg += "\n⚠ Admin override: Shard merging disabled"
 
     await conn.execute(
-        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, quants_to_run, ignore_space_check, enable_shard_merging) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (new_id, req.model_id, "pending", 0, log_msg, "", json.dumps(quants_to_run), 1 if ignore_space_check else 0, 1 if enable_shard_merging else 0)
+        "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, quants_to_run, ignore_space_check, enable_shard_merging, convert_outtype) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (new_id, req.model_id, "pending", 0, log_msg, "", json.dumps(quants_to_run), 1 if ignore_space_check else 0, 1 if enable_shard_merging else 0, convert_outtype)
     )
     await conn.commit()
     await conn.close()
@@ -161,7 +203,8 @@ async def process_model(req: ProcessRequest, background_tasks: BackgroundTasks, 
         quants_to_run=quants_to_run,
         force_llama_update=req.force_llama_update if hasattr(req, 'force_llama_update') else False,
         ignore_space_check=ignore_space_check,
-        enable_shard_merging=enable_shard_merging
+        enable_shard_merging=enable_shard_merging,
+        convert_outtype=convert_outtype,
     )
     
     # Add to queue instead of running directly
@@ -218,9 +261,14 @@ async def process_local_model(req: LocalProcessRequest, background_tasks: Backgr
     if not repo_id or "/" not in repo_id:
         raise HTTPException(status_code=400, detail="repo_id must be in 'owner/name' form (use 'local/<name>' for flat layouts)")
 
-    # Validate and process quants
+    convert_outtype = resolve_convert_outtype(getattr(req, 'convert_outtype', None))
+
+    # Validate and process quants. Direct-outtype mode produces exactly one
+    # artifact named after the outtype — the per-quant selection doesn't apply.
     available_quants = get_quants_list()
-    if req.quants:
+    if convert_outtype:
+        quants_to_run = [convert_outtype.upper()]
+    elif req.quants:
         quants_to_run = validate_quants(req.quants)
         if not quants_to_run:
             raise HTTPException(status_code=400, detail="No valid quants specified")
@@ -239,7 +287,10 @@ async def process_local_model(req: LocalProcessRequest, background_tasks: Backgr
         await conn.execute("DELETE FROM models WHERE hf_repo_id = ?", (repo_id,))
 
     new_id = str(uuid.uuid4())
-    quants_msg = ', '.join(quants_to_run) if len(quants_to_run) < len(available_quants) else 'all quants'
+    if convert_outtype:
+        quants_msg = f"direct {convert_outtype.upper()} (skips llama-quantize)"
+    else:
+        quants_msg = ', '.join(quants_to_run) if len(quants_to_run) < len(available_quants) else 'all quants'
     keep_local = bool(req.keep_local_only)
     log_msg = f"Queued (local source). Quants: {quants_msg}. Keep local only: {keep_local}"
     if req.ignore_space_check:
@@ -249,8 +300,8 @@ async def process_local_model(req: LocalProcessRequest, background_tasks: Backgr
 
     await conn.execute(
         "INSERT INTO models (id, hf_repo_id, status, progress, log, error_details, quants_to_run, "
-        "ignore_space_check, enable_shard_merging, local_source_path, keep_local_only) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "ignore_space_check, enable_shard_merging, local_source_path, keep_local_only, convert_outtype) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             new_id,
             repo_id,
@@ -263,6 +314,7 @@ async def process_local_model(req: LocalProcessRequest, background_tasks: Backgr
             1 if req.enable_shard_merging else 0,
             str(resolved),
             1 if keep_local else 0,
+            convert_outtype,
         )
     )
     await conn.commit()
@@ -276,6 +328,7 @@ async def process_local_model(req: LocalProcessRequest, background_tasks: Backgr
         enable_shard_merging=bool(req.enable_shard_merging),
         local_source_path=str(resolved),
         keep_local_only=keep_local,
+        convert_outtype=convert_outtype,
     )
 
     queue = get_model_queue()
@@ -417,6 +470,10 @@ async def continue_model(model_id: str, background_tasks: BackgroundTasks, body:
     # Get requester info
     requested_by = model.get('requested_by')
 
+    # Get convert_outtype from stored value (None for the standard FP16 flow)
+    stored_outtype = model.get('convert_outtype')
+    convert_outtype = stored_outtype if stored_outtype else None
+
     # Build log message
     log_msg = model['log'] + "\n\n━━━ RESUMING JOB ━━━\n"
     if ignore_space_check:
@@ -439,7 +496,8 @@ async def continue_model(model_id: str, background_tasks: BackgroundTasks, body:
         quants_to_run=quants_to_run,
         ignore_space_check=ignore_space_check,
         enable_shard_merging=enable_shard_merging,
-        requested_by=requested_by
+        requested_by=requested_by,
+        convert_outtype=convert_outtype,
     )
 
     # Add to queue instead of running directly

@@ -382,6 +382,14 @@ input[type="range"].setting-range::-moz-range-thumb {
             <input type="text" id="llama_dir" class="llama-text-input" placeholder="./llama.cpp" autocomplete="off" spellcheck="false">
         </div>
 
+        <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 0.5rem;">
+            <div class="setting-info">
+                <h3>Convert outtypes (fork-specific)</h3>
+                <p>Comma-separated list of compact <code>--outtype</code> values this fork accepts (e.g. <code>iq2_xxs, iq2_xs, q2_k, tq2_0, tq1_0, q8_0</code> for the DeepSeek V4 Flash fork). Users will be able to pick one of these in the conversion form to convert directly, skipping <code>llama-quantize</code>. Leave blank to expose only the standard FP16 + quantize flow.</p>
+            </div>
+            <input type="text" id="llama_outtypes" class="llama-text-input" placeholder="iq2_xxs, q8_0" autocomplete="off" spellcheck="false">
+        </div>
+
         <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 0.4rem;">
             <div class="setting-info">
                 <h3>Current status</h3>
@@ -452,6 +460,8 @@ async function loadLlamaSource() {
         const cfg = await res.json();
         document.getElementById('llama_repo').value = cfg.repo || '';
         document.getElementById('llama_dir').value = cfg.dir || '';
+        const outtypesEl = document.getElementById('llama_outtypes');
+        if (outtypesEl) outtypesEl.value = Array.isArray(cfg.outtypes) ? cfg.outtypes.join(', ') : '';
 
         const parts = [];
         parts.push(`Configured: <code>${escapeHtml(cfg.repo || '')}</code> → <code>${escapeHtml(cfg.dir || '')}</code>`);
@@ -462,10 +472,19 @@ async function loadLlamaSource() {
         } else {
             parts.push('Folder is empty — will be cloned on next run.');
         }
+        if (Array.isArray(cfg.outtypes) && cfg.outtypes.length > 0) {
+            parts.push(`Convert outtypes: <code>${escapeHtml(cfg.outtypes.join(', '))}</code>`);
+        }
         document.getElementById('llama-status-line').innerHTML = parts.join('<br>');
     } catch (e) {
         console.error('Failed to load llama.cpp source config:', e);
     }
+}
+
+function parseOuttypesInput() {
+    const raw = (document.getElementById('llama_outtypes')?.value || '').trim();
+    if (!raw) return [];
+    return raw.split(/[,\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
 }
 
 function escapeHtml(s) {
@@ -487,7 +506,7 @@ async function validateLlamaSource() {
         const res = await fetch('/api/settings/admin/llama-cpp/validate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ repo, dir })
+            body: JSON.stringify({ repo, dir, outtypes: parseOuttypesInput() })
         });
         const data = await res.json();
         if (data.valid) {
@@ -514,7 +533,7 @@ async function saveLlamaSource() {
         const res = await fetch('/api/settings/admin/llama-cpp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ repo, dir })
+            body: JSON.stringify({ repo, dir, outtypes: parseOuttypesInput() })
         });
         if (res.ok) {
             showToast('success', 'llama.cpp source updated');

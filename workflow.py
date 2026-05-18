@@ -359,7 +359,8 @@ class ModelWorkflow:
                  completed_quants: Optional[List[str]] = None, quants_to_run: Optional[List[str]] = None,
                  ignore_space_check: bool = False, force_llama_update: bool = False,
                  enable_shard_merging: bool = True, requested_by: Optional[str] = None,
-                 local_source_path: Optional[str] = None, keep_local_only: bool = False):
+                 local_source_path: Optional[str] = None, keep_local_only: bool = False,
+                 convert_outtype: Optional[str] = None):
         self.model_id = model_id
         self.hf_repo_id = hf_repo_id
         self.log_buffer = []
@@ -403,6 +404,14 @@ class ModelWorkflow:
         self.is_vision_model = False
         self.mmproj_path: Optional[Path] = None
         self.mmproj_uploaded_name: Optional[str] = None
+        # Fork-specific compact convert outtype (e.g. "q8_0", "iq2_xxs"). When set
+        # to a value outside {f16, bf16, f32}, convert_hf_to_gguf.py emits the
+        # final artifact directly and the llama-quantize loop is skipped.
+        self.convert_outtype: Optional[str] = (convert_outtype or "").strip().lower() or None
+        self.is_direct_outtype: bool = bool(
+            self.convert_outtype
+            and self.convert_outtype not in {"f16", "bf16", "f32"}
+        )
 
     async def terminate(self):
         """Request termination of this workflow."""
@@ -1125,8 +1134,15 @@ Great news! Your requested GGUF conversion is now complete!
             await self.progress(10)
             await self.log("")
 
-            # Check if FP16 file already exists (crash recovery)
-            self.fp16_path = CACHE_DIR / f"{self.hf_repo_id.replace('/', '-')}-f16.gguf"
+            # Check if the intermediate GGUF file already exists (crash recovery).
+            # In direct-outtype mode, the converter emits the final artifact instead
+            # of an FP16 intermediate — name it after the chosen outtype so it
+            # doesn't clash with an FP16 file from a previous run.
+            slug = self.hf_repo_id.replace('/', '-')
+            if self.is_direct_outtype:
+                self.fp16_path = CACHE_DIR / f"{slug}-{self.convert_outtype}.gguf"
+            else:
+                self.fp16_path = CACHE_DIR / f"{slug}-f16.gguf"
             fp16_exists = self.fp16_path.exists() and self.fp16_path.stat().st_size > 0
 
             # 2. Download (skip if FP16 already exists, or use local source)
@@ -1280,10 +1296,16 @@ Great news! Your requested GGUF conversion is now complete!
             else:
                 self.start_step("convert")
                 await self.status("converting")
-                await self.log("▶ STEP 3: Converting to GGUF format (FP16)...")
+                outtype_arg = self.convert_outtype if self.is_direct_outtype else "f16"
+                if self.is_direct_outtype:
+                    await self.log(
+                        f"▶ STEP 3: Converting directly to GGUF format ({outtype_arg.upper()}) — llama-quantize will be skipped..."
+                    )
+                else:
+                    await self.log("▶ STEP 3: Converting to GGUF format (FP16)...")
                 convert_script = managers.LLAMA_CPP_DIR / "convert_hf_to_gguf.py"
 
-                cmd = [sys.executable, str(convert_script), str(self.model_dir), "--outfile", str(self.fp16_path), "--outtype", "f16"]
+                cmd = [sys.executable, str(convert_script), str(self.model_dir), "--outfile", str(self.fp16_path), "--outtype", outtype_arg]
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
@@ -1305,7 +1327,12 @@ Great news! Your requested GGUF conversion is now complete!
                 if returncode != 0:
                     raise Exception("Conversion to GGUF failed. Check logs for details.")
 
-                await self.log(f"  ✓ FP16 conversion complete: {self.fp16_path.name}")
+                if self.is_direct_outtype:
+                    await self.log(
+                        f"  ✓ Direct {self.convert_outtype.upper()} conversion complete: {self.fp16_path.name}"
+                    )
+                else:
+                    await self.log(f"  ✓ FP16 conversion complete: {self.fp16_path.name}")
                 self.end_step("convert")
                 await self.progress(50)
 
@@ -1454,7 +1481,12 @@ Great news! Your requested GGUF conversion is now complete!
             await self.log(f"  CPU cores: {total_cores} total")
             await self.log(f"  Parallel jobs: {num_parallel}")
             await self.log(f"  Threads per job: {threads_per_job}")
-            await self.log(f"  Mode: Parallel quantize ({num_parallel} at a time)")
+            if self.is_direct_outtype:
+                await self.log(
+                    f"  Mode: Direct convert outtype ({self.convert_outtype.upper()}) — skipping llama-quantize"
+                )
+            else:
+                await self.log(f"  Mode: Parallel quantize ({num_parallel} at a time)")
             await self.log("")
             
             # Semaphore to limit parallel quantization jobs
@@ -1465,43 +1497,60 @@ Great news! Your requested GGUF conversion is now complete!
                     self.check_terminated()
                     await self.status("quantizing")
                     await self.log(f"  [{overall_idx}/{total_quants}] Starting {q_type}...")
-                    
+
                     q_path = CACHE_DIR / f"{quant_base_name}.{q_type}.gguf"
                     quant_start = time.time()
-                    
+
                     try:
-                        # === QUANTIZE ===
-                        env = os.environ.copy()
-                        if quantize_bin and quantize_bin.parent:
-                            current_ld = env.get('LD_LIBRARY_PATH', '')
-                            env['LD_LIBRARY_PATH'] = f"{quantize_bin.parent}:{current_ld}"
-                        
-                        # Apply threads constraint
-                        env['OMP_NUM_THREADS'] = str(threads_per_job)
-                        env['MKL_NUM_THREADS'] = str(threads_per_job)
-                        env['OPENBLAS_NUM_THREADS'] = str(threads_per_job)
-                        
-                        process = await asyncio.create_subprocess_exec(
-                            str(quantize_bin), str(self.fp16_path), str(q_path), q_type,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                            env=env
-                        )
-                        self.running_processes.append(process)
-                        stdout, stderr = await process.communicate()
-                        try:
-                            self.running_processes.remove(process)
-                        except ValueError:
-                            pass
-                        
-                        quant_duration = time.time() - quant_start
-                        
-                        if process.returncode != 0:
-                            await self.log(f"      ⚠ {q_type} quantization failed: {stderr.decode()[:200]}")
-                            return
-                        
-                        self.quant_times.append((q_type, quant_duration))
-                        await self.log(f"      ✓ {q_type} Quantized ({self.format_duration(quant_duration)})")
+                        if self.is_direct_outtype:
+                            # Direct-outtype mode: the converter already produced the
+                            # final compact GGUF as self.fp16_path. Reuse it as q_path
+                            # instead of running llama-quantize on it.
+                            if not (self.fp16_path and self.fp16_path.exists()
+                                    and self.fp16_path.stat().st_size > 0):
+                                await self.log(
+                                    f"      ⚠ {q_type} expected direct-outtype file missing at {self.fp16_path}"
+                                )
+                                return
+                            q_path = self.fp16_path
+                            quant_duration = time.time() - quant_start
+                            self.quant_times.append((q_type, quant_duration))
+                            await self.log(
+                                f"      ✓ {q_type} ready from direct convert ({self.format_duration(quant_duration)})"
+                            )
+                        else:
+                            # === QUANTIZE ===
+                            env = os.environ.copy()
+                            if quantize_bin and quantize_bin.parent:
+                                current_ld = env.get('LD_LIBRARY_PATH', '')
+                                env['LD_LIBRARY_PATH'] = f"{quantize_bin.parent}:{current_ld}"
+
+                            # Apply threads constraint
+                            env['OMP_NUM_THREADS'] = str(threads_per_job)
+                            env['MKL_NUM_THREADS'] = str(threads_per_job)
+                            env['OPENBLAS_NUM_THREADS'] = str(threads_per_job)
+
+                            process = await asyncio.create_subprocess_exec(
+                                str(quantize_bin), str(self.fp16_path), str(q_path), q_type,
+                                stdout=asyncio.subprocess.PIPE,
+                                stderr=asyncio.subprocess.PIPE,
+                                env=env
+                            )
+                            self.running_processes.append(process)
+                            stdout, stderr = await process.communicate()
+                            try:
+                                self.running_processes.remove(process)
+                            except ValueError:
+                                pass
+
+                            quant_duration = time.time() - quant_start
+
+                            if process.returncode != 0:
+                                await self.log(f"      ⚠ {q_type} quantization failed: {stderr.decode()[:200]}")
+                                return
+
+                            self.quant_times.append((q_type, quant_duration))
+                            await self.log(f"      ✓ {q_type} Quantized ({self.format_duration(quant_duration)})")
                         
                         # Ensure output is a single GGUF file (merge shards if needed)
                         merged_path = await self.ensure_unsharded_gguf(q_path, q_type)

@@ -2,13 +2,15 @@
 Manager classes for llama.cpp and HuggingFace operations.
 """
 import os
+import re
+import json
 import shutil
 import asyncio
 import logging
 import platform
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 from huggingface_hub import HfApi
@@ -19,45 +21,88 @@ logger = logging.getLogger("GGUF_Forge")
 LLAMA_CPP_DIR = None
 LLAMA_CPP_REPO = None
 BASE_DIR = None
+# Fork-specific compact GGUF outtypes available to users at conversion time.
+# Empty list means only the default FP16 + standard llama-quantize flow is exposed.
+LLAMA_CPP_OUTTYPES: List[str] = []
 
 # Defaults captured from env at startup so refresh can fall back to them
 _ENV_LLAMA_CPP_DIR: Optional[Path] = None
 _ENV_LLAMA_CPP_REPO: Optional[str] = None
+_ENV_LLAMA_CPP_OUTTYPES: List[str] = []
 
 DEFAULT_LLAMA_CPP_REPO = "https://github.com/ggerganov/llama.cpp"
+
+# Outtypes that are NOT compact quantizations — selecting one of these is
+# equivalent to today's "FP16 then llama-quantize" flow, not direct-output.
+NON_COMPACT_OUTTYPES = frozenset({"f16", "bf16", "f32"})
+
+_OUTTYPE_RE = re.compile(r"^[a-z0-9_]+$")
+
+
+def normalize_outtypes(values) -> List[str]:
+    """Normalize a list/iterable of outtype strings: trim, lowercase, dedupe, validate shape."""
+    if not values:
+        return []
+    seen = []
+    for v in values:
+        if not isinstance(v, str):
+            continue
+        s = v.strip().lower()
+        if not s or not _OUTTYPE_RE.match(s):
+            continue
+        if s in seen:
+            continue
+        seen.append(s)
+    return seen
 
 # Thread pool for blocking operations
 _executor = ThreadPoolExecutor(max_workers=4)
 
 
-def set_paths(base_dir: Path, llama_cpp_dir: Path, llama_cpp_repo: Optional[str] = None):
+def set_paths(base_dir: Path, llama_cpp_dir: Path, llama_cpp_repo: Optional[str] = None,
+              llama_cpp_outtypes: Optional[List[str]] = None):
     """Set the paths/repo for managers. Values here are treated as the env/default fallback."""
-    global BASE_DIR, LLAMA_CPP_DIR, LLAMA_CPP_REPO, _ENV_LLAMA_CPP_DIR, _ENV_LLAMA_CPP_REPO
+    global BASE_DIR, LLAMA_CPP_DIR, LLAMA_CPP_REPO, LLAMA_CPP_OUTTYPES
+    global _ENV_LLAMA_CPP_DIR, _ENV_LLAMA_CPP_REPO, _ENV_LLAMA_CPP_OUTTYPES
     BASE_DIR = base_dir
     LLAMA_CPP_DIR = llama_cpp_dir
     LLAMA_CPP_REPO = llama_cpp_repo or DEFAULT_LLAMA_CPP_REPO
+    LLAMA_CPP_OUTTYPES = normalize_outtypes(llama_cpp_outtypes)
     _ENV_LLAMA_CPP_DIR = llama_cpp_dir
     _ENV_LLAMA_CPP_REPO = LLAMA_CPP_REPO
+    _ENV_LLAMA_CPP_OUTTYPES = list(LLAMA_CPP_OUTTYPES)
 
 
 async def refresh_llama_config():
-    """Reload LLAMA_CPP_DIR and LLAMA_CPP_REPO from DB (with env/default fallback).
+    """Reload LLAMA_CPP_DIR, LLAMA_CPP_REPO, and LLAMA_CPP_OUTTYPES from DB (with env/default fallback).
 
     Priority: app_config DB row > env-supplied value (captured in set_paths) > default.
     Safe to call before init_db — falls back to env values if the DB read fails.
     """
-    global LLAMA_CPP_DIR, LLAMA_CPP_REPO
+    global LLAMA_CPP_DIR, LLAMA_CPP_REPO, LLAMA_CPP_OUTTYPES
     try:
         from database import get_app_config
         db_dir = await get_app_config("llama_cpp_dir")
         db_repo = await get_app_config("llama_cpp_repo")
+        db_outtypes = await get_app_config("llama_cpp_outtypes")
     except Exception as e:
         logger.debug(f"refresh_llama_config: DB read skipped ({e})")
         db_dir = None
         db_repo = None
+        db_outtypes = None
 
     LLAMA_CPP_DIR = Path(db_dir).expanduser() if db_dir else _ENV_LLAMA_CPP_DIR
     LLAMA_CPP_REPO = db_repo or _ENV_LLAMA_CPP_REPO or DEFAULT_LLAMA_CPP_REPO
+
+    parsed_outtypes: List[str] = []
+    if db_outtypes:
+        try:
+            parsed_outtypes = json.loads(db_outtypes)
+            if not isinstance(parsed_outtypes, list):
+                parsed_outtypes = []
+        except (ValueError, TypeError):
+            parsed_outtypes = []
+    LLAMA_CPP_OUTTYPES = normalize_outtypes(parsed_outtypes) if parsed_outtypes else list(_ENV_LLAMA_CPP_OUTTYPES)
 
 
 async def get_current_origin(folder: Optional[Path] = None) -> Optional[str]:

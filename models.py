@@ -16,6 +16,7 @@ class ProcessRequest(BaseModel):
     force_llama_update: Optional[bool] = False  # If True, forcefully update llama.cpp to latest commit
     ignore_space_check: Optional[bool] = False  # If True, bypass conservative disk space checks
     enable_shard_merging: Optional[bool] = True  # If True, merge GGUF shards into single file for Ollama compatibility
+    convert_outtype: Optional[str] = None  # Fork-specific compact GGUF outtype (e.g. "q8_0", "iq2_xxs"). When set, the converter produces a single direct output and llama-quantize is skipped.
 
 
 class ModelRequestSubmit(BaseModel):
@@ -56,9 +57,11 @@ class LocalProcessRequest(BaseModel):
     keep_local_only: Optional[bool] = False  # If True, skip HF upload and write GGUFs into <path>/gguf/
     ignore_space_check: Optional[bool] = False
     enable_shard_merging: Optional[bool] = True
+    convert_outtype: Optional[str] = None  # Fork-specific compact GGUF outtype; when set, skips llama-quantize.
 
 
 class LlamaCppSourceConfig(BaseModel):
     """Admin: configure which llama.cpp fork/folder GGUF Forge uses."""
     repo: str  # Git URL, e.g. https://github.com/<owner>/llama.cpp
     dir: str   # Absolute or relative folder path for the local checkout
+    outtypes: Optional[List[str]] = None  # Fork-specific compact --outtype values (e.g. ["iq2_xxs", "q8_0"]).

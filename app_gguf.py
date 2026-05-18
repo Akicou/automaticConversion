@@ -98,6 +98,12 @@ else:
 # Lets users point GGUF Forge at a fork (e.g. one with extra model support).
 LLAMA_CPP_REPO = os.getenv("LLAMA_CPP_REPO", "").strip() or "https://github.com/ggerganov/llama.cpp"
 
+# Fork-specific compact GGUF outtypes — comma-separated list (e.g. "iq2_xxs,q8_0").
+# Used as the env-level fallback; the admin UI persists per-fork values in the DB.
+LLAMA_CPP_OUTTYPES = [
+    s.strip().lower() for s in os.getenv("LLAMA_CPP_OUTTYPES", "").split(",") if s.strip()
+]
+
 DB_PATH = BASE_DIR / "gguf_app.db"
 
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -129,7 +135,7 @@ from websocket_manager import manager as ws_manager
 
 # Set paths for modules
 set_db_path(DB_PATH)
-set_manager_paths(BASE_DIR, LLAMA_CPP_DIR, LLAMA_CPP_REPO)
+set_manager_paths(BASE_DIR, LLAMA_CPP_DIR, LLAMA_CPP_REPO, LLAMA_CPP_OUTTYPES)
 set_workflow_config(CACHE_DIR, LLAMA_CPP_DIR, QUANTS, PARALLEL_QUANT_JOBS)
 
 # Initialize security instances

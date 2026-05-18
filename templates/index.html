@@ -765,8 +765,23 @@
         </div>
         {% endif %}
 
+        <!-- Convert outtype (visible only when fork-specific outtypes are configured) -->
+        <div id="convert-outtype-panel" style="display: none; margin-top: 1rem;">
+            <label for="convert-outtype" style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.35rem;">
+                Convert outtype
+            </label>
+            <select id="convert-outtype" onchange="onConvertOuttypeChange()"
+                style="background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); color: var(--text-primary); padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; min-width: 320px;">
+                <option value="">FP16 → standard quantization</option>
+            </select>
+            <div id="convert-outtype-hint"
+                style="margin-top: 0.4rem; font-size: 0.75rem; color: var(--text-secondary); display: none;">
+                Direct convert mode — exactly one file will be produced; <code>llama-quantize</code> is skipped.
+            </div>
+        </div>
+
         <!-- Quant Selection Panel -->
-        <div style="margin-top: 1rem;">
+        <div id="quant-selection-wrapper" style="margin-top: 1rem;">
             <button type="button" id="quant-toggle" onclick="toggleQuantSelector()"
                 style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
                 <span id="quant-toggle-icon">▶</span>
@@ -1240,6 +1255,51 @@
         return Array.from(checkboxes).map(cb => cb.value);
     }
 
+    // ====== Fork-specific convert outtypes ======
+    let forkOuttypes = [];
+
+    async function loadForkOuttypes() {
+        const panel = document.getElementById('convert-outtype-panel');
+        if (!panel) return;
+        try {
+            const res = await fetch('/api/settings/llama-cpp-outtypes');
+            if (!res.ok) return;
+            const data = await res.json();
+            forkOuttypes = Array.isArray(data.outtypes) ? data.outtypes : [];
+        } catch (e) {
+            console.error('Failed to load fork outtypes:', e);
+            forkOuttypes = [];
+        }
+
+        if (forkOuttypes.length === 0) {
+            panel.style.display = 'none';
+            return;
+        }
+        const select = document.getElementById('convert-outtype');
+        // Reset to defaults + configured outtypes
+        select.innerHTML = '<option value="">FP16 → standard quantization</option>'
+            + forkOuttypes.map(o => `<option value="${o}">${o.toUpperCase()} (direct, skips llama-quantize)</option>`).join('');
+        panel.style.display = 'block';
+    }
+
+    function getConvertOuttype() {
+        const el = document.getElementById('convert-outtype');
+        return el && el.value ? el.value : null;
+    }
+
+    function onConvertOuttypeChange() {
+        const wrapper = document.getElementById('quant-selection-wrapper');
+        const hint = document.getElementById('convert-outtype-hint');
+        const chosen = getConvertOuttype();
+        if (chosen) {
+            if (wrapper) wrapper.style.display = 'none';
+            if (hint) hint.style.display = 'block';
+        } else {
+            if (wrapper) wrapper.style.display = 'block';
+            if (hint) hint.style.display = 'none';
+        }
+    }
+
     function selectAllQuants() {
         document.querySelectorAll('.quant-checkbox').forEach(cb => cb.checked = true);
         updateQuantCount();
@@ -1434,6 +1494,7 @@
 
     // Load quants on page load
     loadAvailableQuants();
+    loadForkOuttypes();
 
     // ====== LOCAL MODELS (Admin only) ======
     function formatBytes(bytes) {
@@ -1515,6 +1576,7 @@
         const keepLocalOnly = keepEl ? keepEl.checked : true;
         const selectedQuants = getSelectedQuants();
         try {
+            const convertOuttype = getConvertOuttype();
             const res = await fetch('/api/models/process-local', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1524,7 +1586,8 @@
                     quants: selectedQuants.length > 0 ? selectedQuants : null,
                     keep_local_only: keepLocalOnly,
                     ignore_space_check: false,
-                    enable_shard_merging: true
+                    enable_shard_merging: true,
+                    convert_outtype: convertOuttype
                 })
             });
             const data = await res.json();
@@ -1853,13 +1916,15 @@ async function convertModel() {
             console.log('[convertModel] Starting conversion for:', modelId);
             console.log('[convertModel] Selected quants:', selectedQuants);
 
+            const convertOuttype = getConvertOuttype();
             const res = await fetch('/api/models/process', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     model_id: modelId,
                     quants: selectedQuants.length > 0 ? selectedQuants : null,
-                    ignore_space_check: !document.getElementById('validationCheck').checked
+                    ignore_space_check: !document.getElementById('validationCheck').checked,
+                    convert_outtype: convertOuttype
                 })
             });
 
@@ -1883,6 +1948,12 @@ async function convertModel() {
                     if (quantSelector) quantSelector.style.display = 'none';
                     const toggleIcon = document.getElementById('quant-toggle-icon');
                     if (toggleIcon) toggleIcon.textContent = '▶';
+                    // Reset convert outtype dropdown back to FP16 default
+                    const outtypeEl = document.getElementById('convert-outtype');
+                    if (outtypeEl) {
+                        outtypeEl.value = '';
+                        onConvertOuttypeChange();
+                    }
                 }, 2000);
 
                 fetchStatus();
